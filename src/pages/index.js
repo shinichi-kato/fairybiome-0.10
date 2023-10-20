@@ -1,24 +1,21 @@
 import * as React from 'react';
-import Container from '@mui/material/Container';
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import ProTip from '../components/ProTip';
-import Link from '../components/Link';
-import Copyright from '../components/Copyright';
+
+import AuthProvider from '../components/Auth/AuthProvider';
+import useFirebase from "../useFirebase";
+
 
 export default function Index() {
+  const [firebase, firestore] = useFirebase();
+
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Material UI Gatsby example
-        </Typography>
-        <Link to="/about" color="secondary">
-          Go to the about page
-        </Link>
-        <ProTip />
-        <Copyright />
-      </Box>
-    </Container>
+    <AuthProvider firebase={firebase}>
+      app
+    </AuthProvider>
   );
 }
+
+export const Head = () =>
+  <>
+    <html lang="jp" />
+    <title>妖精バイオーム</title>
+  </>

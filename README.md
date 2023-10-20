@@ -41,8 +41,16 @@ GATSBY_FIREBASE_MEASUREMENT_ID={...}
 ### firebase 接続
 
 [firebase CLIをインストールする](https://firebase.google.com/docs/cli?hl=ja#mac-linux-auto-script)を参照して
+以下のコマンドを実行してください。
 
 ```
 curl -sL https://firebase.tools | bash
 firebase login
 ```
+
+firebaseでfirestoreのセットアップを行い、githubで空のリポジトリを作成した後、プロジェクトの初期化を行います。
+
+```
+firebase init
+```
+

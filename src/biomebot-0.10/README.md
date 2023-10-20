@@ -3,7 +3,7 @@ biomebot-0.10
 チャットボットモジュール
 
 ## メカニズム
-人の心には複数の「心のパート」が存在し、すべてが並列的に動作しながら発言権は競争的に
+人の心には複数の「心のパート」が存在し、それらが並列的に動作しながら発言権は競争的に
 調整されている。この挙動を再現するため、本チャットボットはシンプルなチャットボットを
 複数 web worker として動作させ、それらの取りまとめを別の web worker が行う構成とし、
 前者をpart、後者をcentralと呼ぶ。アプリケーションのAPIはcentralが担当する。
@@ -55,10 +55,11 @@ textには{env.user_login}、{env.morning}などのタグを用いる。{env.*}
 1. {type: 'init'}または{type: 'resume'}によりチャットボットが起動される
 
 2. ユーザが発言した場合、それを{type: 'user_speech'}として投入する。
-このメッセージはすべてのpartが受取り、結果を{type:'internal_speech}としてを投入する。
+このメッセージはすべてのpartが受取り、必要な場合結果を{type:'internal_speech}
+としてを投入する。
 
-3. {type: 'environment'}が投入されたらすべてのpartが受取り、結果を{type:'internal_speech'}
-として投入する。
+3. {type: 'environment'}が投入されたらすべてのpartがそれを受取り、必要に応じて
+結果を{type:'internal_speech'}として投入する。
 
 4. centralは設定した期間の間{type: 'internal_speech'}を受取り、その中でスコアが
 一定以上で最も高いものを{type: 'bot_speech'}として投入する。スコアが高いものが複数あったら両方を
@@ -93,7 +94,16 @@ centralはメインスクリプトを読み込んで、パートのweb workerを
 最も強いものが複数あった場合は両方発言する。
 
 ### part
-
+{
+    name,
+    response: {
+        minIntensity    // 返答の強度がminIntensity以上だった場合に返答を投入する
+    },
+    retention: {        // このパートの発言が採用された場合、次回のユーザ入力について
+        min,            // min,maxで設定した幅を持つ正規分布する乱数のぶん
+        max             // Intensityを底上げする
+    }
+}
 パートは
 
 パートに

@@ -1,6 +1,6 @@
 {
-  "name": "material-ui-gatsby",
-  "version": "5.0.0",
+  "name": "fairybiome",
+  "version": "0.10.0",
   "private": true,
   "browserslist": [
     ">0.25%",
@@ -10,13 +10,14 @@
     "@emotion/react": "^11.11.1",
     "@emotion/server": "latest",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.14",
     "@mui/material": "^5.14.12",
     "firebase": "^10.4.0",
     "gatsby": "latest",
-    "gatsby-plugin-react-helmet": "latest",
+    "gatsby-plugin-manifest": "^5.12.2",
+    "gatsby-source-filesystem": "^5.12.0",
     "react": "latest",
-    "react-dom": "latest",
-    "react-helmet": "latest"
+    "react-dom": "latest"
   },
   "scripts": {
     "develop": "gatsby develop",
