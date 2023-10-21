@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -13,14 +12,43 @@ import EmailIcon from '@mui/icons-material/Email';
 import KeyIcon from '@mui/icons-material/Key';
 import { Button } from '@mui/material';
 
+function CustomInput({ title, value, onChange, startIcon, type = 'text' }) {
+  return (
+    <Box sx={{ p: 1 }}>
+      <Box>
+        <Typography>
+          {title}
+        </Typography>
+      </Box>
+      <Box>
+        <Input
+          sx={{
+            backgroundColor: "inputBg.main",
+            p: 0.5,
+            borderRadius: 2
+          }}
+          required
+          type={type}
+          value={value}
+          onChange={onChange}
+          startAdornment={
+            <InputAdornment position="start">
+              {startIcon}
+            </InputAdornment>
+          } />
+      </Box>
+    </Box>
+  )
+}
+
 export default function SignUpSignInDialog({ state, authState, authDispatch, handleSignOff, handleSignUp, handleSignIn }) {
-  const [password1, setPassword1] = useState(null);
-  const [password2, setPassword2] = useState(null);
+  const [password1, setPassword1] = useState("");
+  const [password2, setPassword2] = useState("");
   const [email, setEmail] = useState("");
 
   const page = state.presentPage;
   const passwordUnmatched =
-    password2 != null && !(
+    password2 !== "" && !(
       password1 !== "" && password2 !== "" && password1 === password2
     );
 
@@ -33,12 +61,16 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
   }
 
   return (
-    <Paper
+    <Box
       sx={{
         marginTop: 8,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        maxWidth: 'xs',
+        px: 'auto',
+        borderRadius: "16px 16px 0px 0px",
+        backgroundColor: 'background.paper'
       }}>
       <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
         <LockOutlinedIcon />
@@ -46,54 +78,44 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
       <Typography component="h1" variant="h5">
         {page === 'openSignUp' ? "ユーザ登録" : "サインイン"}
       </Typography>
-      <Box component="form" onSubmit={handleSignUp} sx={{ m: 1 }}>
-        <FormControl variant="standard">
-          <InputLabel shrink htmlFor="email-input">
-            Email
-          </InputLabel>
-          <Input id="email-input"
-            value={email}
-            onChange={e => { setEmail(e.target.value) }}
-            startAdornment={
-              <InputAdornment position="start">
-                <EmailIcon />
-              </InputAdornment>
-            } />
-        </FormControl>
-        <FormControl variant="standard">
-          <InputLabel shrink htmlFor="password1-input">
-            パスワード
-          </InputLabel>
-          <Input id="pasword1-input"
-            value={password1}
-            onChange={e => { setPassword1(e.target.value) }}
-            startAdornment={
-              <InputAdornment position="start">
-                <KeyIcon />
-              </InputAdornment>
-            } />
-        </FormControl>
+
+      <Box component="form" onSubmit={handleSignUp}
+        sx={{
+          m: 1,
+          width: 'xs',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+        <CustomInput
+          title="Email"
+          value={email}
+          onChange={e => { setEmail(e.target.value) }}
+          startIcon={<EmailIcon />}
+        />
+        <CustomInput
+          title="パスワード"
+          type="password"
+          value={password1}
+          onChange={e => { setPassword1(e.target.value) }}
+          startIcon={<KeyIcon />}
+        />
         {page === 'openSignUp' &&
-          <FormControl variant="standard">
-            <InputLabel shrink htmlFor="password2-input">
-              パスワード(確認)
-            </InputLabel>
-            <Input id="pasword2-input"
+          <>
+            <CustomInput
+              title="パスワード(確認)"
               value={password2}
+              type="password"
               onChange={e => { setPassword2(e.target.value) }}
-              startAdornment={
-                <InputAdornment position="start">
-                  <KeyIcon />
-                </InputAdornment>
-              }
-              aria-describedby="password2-message" />
-            <FormHelperText id="password2-message">
-              {passwordUnmatched && "パスワードが一致しません"}
-            </FormHelperText>
-          </FormControl>
+              startIcon={<KeyIcon />}
+            />
+            {passwordUnmatched && "パスワードが一致しません"}
+          </>
         }
         {page === 'openSignUp' ?
-          <Box>
+          <Box
+            alignSelf="flex-end"
+          >
             <Button
               variant="text"
               onClick={() => authDispatch({ type: 'signIn' })}>
@@ -107,7 +129,10 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
             </Button>
           </Box>
           :
-          <Box>
+          <Box
+            alignSelf="flex-end"
+            sx={{p:1}}
+          >
             <Button
               variant="text"
               onClick={() => authDispatch({ type: 'signUp' })}
@@ -116,14 +141,17 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
             </Button>
             <Button
               variant="contained"
-              disabled={authState==='waiting'}
+              disabled={authState.subState === 'waiting'}
               onClick={signIn}
             >
               サインイン
             </Button>
           </Box>
         }
-        <Box>
+        {authState.subState}
+        <Box
+          sx={{p:1}}
+        >
           <Button
             variant="text"
             size="small"
@@ -134,6 +162,6 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
         </Box>
 
       </Box>
-    </Paper >
+    </Box >
   )
 }

@@ -2,6 +2,7 @@ import React, { useReducer, useEffect } from 'react';
 import Drawer from '@mui/material/Drawer';
 import SignUpSignInDialog from './SignUpSignInDialog';
 import UserSettingsDialog from './UserSettingsDialog';
+import { Container } from '@mui/material';
 
 const initialState = {
   futurePage: null,
@@ -69,6 +70,7 @@ export default function AuthDialog({
     if (typeof targetPage === 'string' && targetPage.startsWith('open')) {
       dispatch({ type: 'setTarget', page: targetPage })
     } else {
+      console.log(authState)
       dispatch({ type: 'close' })
     }
 
@@ -78,31 +80,38 @@ export default function AuthDialog({
     <Drawer
       anchor="bottom"
       open={state.open}
+      elevation={0}
+      sx={{ maxWidth: 'xs', backgroundColor: 'transparent', px: 'auto' }}
       PaperProps={{
-        sx:{width: 'xs'}
+        sx: { width: 'xs', backgroundColor: 'drawerBg.main', square: true }
       }}
       SlideProps={{
         unmountOnExit: state.ummountOnExit,
         onExited: () => { dispatch({ type: 'onExit' }) }
       }}
     >
-      {(state.presentPage === 'openSignIn' || state.presentPage === 'openSignUp' )&&
-        <SignUpSignInDialog 
-          state={state}
-          authState={authState}
-          authDispatch={authDispatch}
-          
-          handleSignIn={handleSignIn}
-          handleSignUp={handleSignUp}
-          handleSignOff={handleSignOff}
+      <Container
+        maxWidth="xs"
+      >
+        {(state.presentPage === 'openSignIn' || state.presentPage === 'openSignUp') &&
+          <SignUpSignInDialog
+            state={state}
+            authState={authState}
+            authDispatch={authDispatch}
 
-        />
-      }
-      {state.presentPage === 'openUserSettings' &&
-        <UserSettingsDialog
-          handleChangeUserSettings={handleChangeUserSettings}
-        />
-      }
+            handleSignIn={handleSignIn}
+            handleSignUp={handleSignUp}
+            handleSignOff={handleSignOff}
+
+          />
+        }
+        {state.presentPage === 'openUserSettings' &&
+          <UserSettingsDialog
+            handleChangeUserSettings={handleChangeUserSettings}
+          />
+        }
+
+      </Container>
 
     </Drawer>
   )

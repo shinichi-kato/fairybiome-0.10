@@ -30,11 +30,15 @@ import AuthDialog from './AuthDialog';
 
 export const AuthContext = createContext();
 
+const MESSAGE_MAP = {
+  'auth/configuration-not-found': 'firebaseの認証を有効にしてください',
+};
+
 const initialState = {
   auth: null,
   authState: 'init',
   user: null,
-  errorCode: null
+  subState: null
 };
 
 function reducer(state, action) {
@@ -46,7 +50,7 @@ function reducer(state, action) {
         ...initialState,
         auth: action.auth,
         authState: 'connected',
-        errorCode: null
+        subState: null
       }
     }
     case 'disconnect': {
@@ -59,9 +63,10 @@ function reducer(state, action) {
       const u = action.user;
       if (!u) {
         return {
+          auth: state.auth,
           user: null,
           authState: 'openSignIn',
-          errorCode: null
+          subState: null
         }
       }
       if (u.email === null) {
@@ -71,16 +76,18 @@ function reducer(state, action) {
             photoURL: null,
             displayName: null
           },
+          auth: state.auth,
           authState: 'openUserSettings',
-          errorCode: null
+          subState: null
         }
       } else {
         return {
           user: {
             ...u
           },
+          auth: state.auth,
           authState: 'ready',
-          errorCode: null
+          subState: null
         }
       }
     }
@@ -89,7 +96,7 @@ function reducer(state, action) {
       return {
         ...state,
         authState: 'openSignIn',
-        errorCode: null
+        subState: null
       }
     }
 
@@ -97,7 +104,7 @@ function reducer(state, action) {
       return {
         ...state,
         authState: 'openSignUp',
-        errorCode: null
+        subState: null
       }
     }
 
@@ -114,21 +121,30 @@ function reducer(state, action) {
         ...state,
         user: action.user,
         authState: 'ready',
-        errorCode: null
+        subState: null
       }
     }
 
     case 'waiting': {
       return {
         ...state,
-        authState: 'waiting'
+        subState: 'waiting'
       }
     }
 
     case 'error': {
+      const code = action.errorCode
+      for(var msg in MESSAGE_MAP){
+        if(code.indexOf(msg) !== -1){
+          return {
+            ...state,
+            subState: MESSAGE_MAP[msg]
+          }
+        }
+      }
       return {
         ...state,
-        errorCode: action.errorCode
+        subState: code
       }
     }
 
@@ -181,7 +197,7 @@ export default function AuthProvider({ firebase, children }) {
       .catch((error) => {
         dispatch({
           type: 'error',
-          errorCode: error.code
+          errorCode: error
         })
       });
   }
@@ -197,9 +213,10 @@ export default function AuthProvider({ firebase, children }) {
     signInWithEmailAndPassword(state.auth, email, password)
       // 成功した場合はonAuthStateChangedがトリガされる
       .catch((error) => {
+        console.log(error.message);
         dispatch({
           type: 'error',
-          error: error
+          errorCode: error.message
         })
       });
   }
