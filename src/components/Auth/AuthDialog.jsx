@@ -70,12 +70,11 @@ export default function AuthDialog({
     if (typeof targetPage === 'string' && targetPage.startsWith('open')) {
       dispatch({ type: 'setTarget', page: targetPage })
     } else {
-      console.log(authState)
       dispatch({ type: 'close' })
     }
 
   }, [targetPage]);
-
+  
   return (
     <Drawer
       anchor="bottom"
@@ -107,6 +106,9 @@ export default function AuthDialog({
         }
         {state.presentPage === 'openUserSettings' &&
           <UserSettingsDialog
+            authState={authState}
+            authDispatch={authDispatch}
+            handleSignOff={handleSignOff}
             handleChangeUserSettings={handleChangeUserSettings}
           />
         }

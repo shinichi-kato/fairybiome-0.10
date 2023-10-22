@@ -1,9 +1,6 @@
 /*
 AuthProvider
 
-1. AuthStateChangeでNG→サインアップ/サインイン画面
-  └サインアップ
-
   authState       状態
   ----------------------------------------------------------------------
   init                初期状態                                            
@@ -15,6 +12,23 @@ AuthProvider
   ready               サインオンしており、ユーザ情報も登録されている
   waiting　           onAuthStateChangeの結果待ち                          
   ----------------------------------------------------------------------
+
+  AuthProviderではfirebaseのauth周りとアプリで使用するユーザ設定を
+  管理する。firebaseのuserオブジェクトでは以下の3パラメータを管理する。
+  このうちphotoURLには吹き出し横に表示するアイコンのURLを指定し、
+  同じディレクトリにはユーザのアバターが格納されているものとみなす。
+
+  user: {
+    email
+    displayName
+    photoURL
+  }
+
+  上記に加え、追加で下記のデータをfirestoreでユーザごとに管理する
+  userProps: {
+    backgroundColor
+  }
+
 */
 
 import React, { useReducer, createContext, useEffect, useRef } from 'react';
@@ -22,22 +36,26 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  updateProfile,
   getAuth, signOut
 } from 'firebase/auth';
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
-import Container from '@mui/material/Container';
 import AuthDialog from './AuthDialog';
 
 export const AuthContext = createContext();
 
 const MESSAGE_MAP = {
-  'auth/configuration-not-found': 'firebaseの認証を有効にしてください',
+  'configuration-not-found': 'firebaseのmail/password認証を有効にしてください',
+  'invalid-login-credentials': 'ユーザが登録されていません',
+  'Missing or insufficient permissions': 'firestoreのルールを読み書き可能に変更してください',
 };
 
 const initialState = {
   auth: null,
   authState: 'init',
   user: null,
+  userProps: null,
   subState: null
 };
 
@@ -59,36 +77,42 @@ function reducer(state, action) {
         authState: 'disconnected'
       }
     }
-    case 'login': {
+    case 'authStateChange': {
       const u = action.user;
+      const p = action.userProps || state.userProps;
       if (!u) {
         return {
           auth: state.auth,
           user: null,
           authState: 'openSignIn',
-          subState: null
+          subState: null,
+          userProps: null,
         }
       }
-      if (u.email === null) {
+      if (u.displayName === null) {
         return {
-          user: {
-            email: null,
-            photoURL: null,
-            displayName: null
-          },
+          user: u,
           auth: state.auth,
           authState: 'openUserSettings',
-          subState: null
+          subState: null,
+          userProps: null,
         }
-      } else {
+      }
+      if (!p) {
         return {
-          user: {
-            ...u
-          },
+          user: u,
           auth: state.auth,
-          authState: 'ready',
-          subState: null
+          authState: 'openUserSettings',
+          subState: null,
+          userProps: null
         }
+      }
+      return {
+        user: u,
+        auth: state.auth,
+        authState: 'ready',
+        subState: null,
+        userProps: p
       }
     }
 
@@ -111,15 +135,39 @@ function reducer(state, action) {
     case 'userSettings': {
       return {
         ...state,
-        user: action.user ? action.user : state.user,
-        authState: 'openUserSettings'
+        authState: 'openUserSettings',
+        subState: null
+      }
+    }
+
+    case 'changeUserSettings': {
+      let user = state.user;
+      let userProps = state.userProps;
+
+      if (action.displayName) {
+        user.displayName = action.displayName
+      }
+      if (action.photoURL) {
+        user.photoURL = action.photoURL
+      }
+      if (action.backgroundColor) {
+        if (!userProps) {
+          userProps = {}
+        }
+        userProps.backgroundColor = action.backgroundColor;
+      }
+
+      return {
+        ...state,
+        user: user,
+        userProps: userProps,
       }
     }
 
     case 'ready': {
       return {
         ...state,
-        user: action.user,
+        user: action.user || state.user,
         authState: 'ready',
         subState: null
       }
@@ -134,8 +182,8 @@ function reducer(state, action) {
 
     case 'error': {
       const code = action.errorCode
-      for(var msg in MESSAGE_MAP){
-        if(code.indexOf(msg) !== -1){
+      for (var msg in MESSAGE_MAP) {
+        if (code.indexOf(msg) !== -1) {
           return {
             ...state,
             subState: MESSAGE_MAP[msg]
@@ -153,9 +201,10 @@ function reducer(state, action) {
   }
 }
 
-export default function AuthProvider({ firebase, children }) {
+export default function AuthProvider({ firebase, firestore, children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const unsubscribeRef = useRef();
+  const uid = state.user?.uid;
 
   // -----------------------------------
   // 初期化
@@ -171,9 +220,9 @@ export default function AuthProvider({ firebase, children }) {
 
       unsubscribeRef.current = onAuthStateChanged(auth, user => {
         dispatch({
-          type: 'login',
+          type: 'authStateChange',
           user: user
-        })
+        });
       });
     }
 
@@ -182,6 +231,31 @@ export default function AuthProvider({ firebase, children }) {
     }
 
   }, [firebase]);
+
+  // ----------------------------------------------------------
+  //  ユーザ追加情報の初期化
+  //  displayName, photoURLはuserオブジェクトを利用する。
+  //  それ以外のユーザ設定情報はfirestoreに格納しており、
+  //  ここで取得する。
+
+  useEffect(() => {
+    if (uid) {
+      const docRef = doc(firestore, "users", uid);
+      getDoc(docRef).then(snap => {
+        if (snap.exists()) {
+          dispatch({
+            type: 'authStateChange',
+            userProps: snap.data()
+          })
+        }
+      }).catch(error => {
+        dispatch({
+          type: 'error',
+          errorCode: error.message
+        })
+      })
+    }
+  }, [uid, firestore]);
 
   // -----------------------------------------------------------
   //
@@ -197,7 +271,7 @@ export default function AuthProvider({ firebase, children }) {
       .catch((error) => {
         dispatch({
           type: 'error',
-          errorCode: error
+          errorCode: error.message
         })
       });
   }
@@ -234,17 +308,28 @@ export default function AuthProvider({ firebase, children }) {
 
   // -----------------------------------------------------------
   //
-  // ユーザ情報変更
+  //  ユーザ情報の更新
+  //
+  //　ユーザ情報のうちuserは
+  //  userPropsはfirestoreに書き込む
   //
 
-  function handleChangeUserSettings(displayName, photoURL) {
+  function handleChangeUserSettings(data) {
+    if (data.displayName || data.photoURL) {
+      updateProfile(state.auth.currentUser, {
+        displayName: data.displayName,
+        photoURL: data.photoURL,
+      })
+    }
+    if (data.backgroundColor) {
+      const docRef = doc(firestore, "users", uid);
+      setDoc(docRef, {
+        backgroundColor: data.backgroundColor
+      });
+    }
     dispatch({
-      type: 'ready',
-      user: {
-        ...state.user,
-        photoURL: photoURL,
-        displayName: displayName
-      }
+      type: 'changeUserSettings',
+      ...data
     })
   }
 
@@ -257,20 +342,15 @@ export default function AuthProvider({ firebase, children }) {
         handleSignOff: handleSignOff
       }}
     >
-      <Container 
-        maxWidth="xs"
-        disableGutters
-        sx={{height: '100vh'}}>
-        {children}
-        <AuthDialog
-          authState={state}
-          authDispatch={dispatch}
-          handleSignOff={handleSignOff}
-          handleSignUp={handleSignUp}
-          handleSignIn={handleSignIn}
-          handleChangeUserSettings={handleChangeUserSettings}
-        />
-      </Container>
+      {children}
+      <AuthDialog
+        authState={state}
+        authDispatch={dispatch}
+        handleSignOff={handleSignOff}
+        handleSignUp={handleSignUp}
+        handleSignIn={handleSignIn}
+        handleChangeUserSettings={handleChangeUserSettings}
+      />
     </AuthContext.Provider>
   )
 }

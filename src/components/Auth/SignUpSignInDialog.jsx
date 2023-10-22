@@ -3,43 +3,12 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Avatar from '@mui/material/Avatar';
-import Input from '@mui/material/InputBase';
-import InputAdornment from '@mui/material/InputAdornment';
-import FormControl from '@mui/material/FormControl';
-import FormHelperText from '@mui/material/FormHelperText';
-import InputLabel from '@mui/material/InputLabel';
 import EmailIcon from '@mui/icons-material/Email';
 import KeyIcon from '@mui/icons-material/Key';
-import { Button } from '@mui/material';
+import Button from '@mui/material/Button';
 
-function CustomInput({ title, value, onChange, startIcon, type = 'text' }) {
-  return (
-    <Box sx={{ p: 1 }}>
-      <Box>
-        <Typography>
-          {title}
-        </Typography>
-      </Box>
-      <Box>
-        <Input
-          sx={{
-            backgroundColor: "inputBg.main",
-            p: 0.5,
-            borderRadius: 2
-          }}
-          required
-          type={type}
-          value={value}
-          onChange={onChange}
-          startAdornment={
-            <InputAdornment position="start">
-              {startIcon}
-            </InputAdornment>
-          } />
-      </Box>
-    </Box>
-  )
-}
+import CustomInput from './CustomInput';
+
 
 export default function SignUpSignInDialog({ state, authState, authDispatch, handleSignOff, handleSignUp, handleSignIn }) {
   const [password1, setPassword1] = useState("");
@@ -51,6 +20,10 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
     password2 !== "" && !(
       password1 !== "" && password2 !== "" && password1 === password2
     );
+  
+  const submitNotReady = 
+    passwordUnmatched || password1 === "" || email === "" ||
+    authState.subState === 'waiting';
 
   function signUp(e) {
     handleSignUp(email, password1);
@@ -109,7 +82,10 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
               onChange={e => { setPassword2(e.target.value) }}
               startIcon={<KeyIcon />}
             />
-            {passwordUnmatched && "パスワードが一致しません"}
+            {passwordUnmatched &&
+              <Typography sx={{color: 'error.main'}}>
+                パスワードが一致していません
+              </Typography>}
           </>
         }
         {page === 'openSignUp' ?
@@ -131,17 +107,19 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
           :
           <Box
             alignSelf="flex-end"
-            sx={{p:1}}
+            sx={{ p: 1 }}
           >
             <Button
               variant="text"
+              disabled={submitNotReady}
+              type="submit"
               onClick={() => authDispatch({ type: 'signUp' })}
             >
               ユーザ登録
             </Button>
             <Button
               variant="contained"
-              disabled={authState.subState === 'waiting'}
+              disabled={submitNotReady}
               onClick={signIn}
             >
               サインイン
@@ -150,7 +128,7 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
         }
         {authState.subState}
         <Box
-          sx={{p:1}}
+          sx={{ p: 1 }}
         >
           <Button
             variant="text"
