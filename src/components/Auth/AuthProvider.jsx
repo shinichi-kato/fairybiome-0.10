@@ -156,6 +156,12 @@ function reducer(state, action) {
         }
         userProps.backgroundColor = action.backgroundColor;
       }
+      if (action.avatarDir) {
+        if(!userProps) {
+          userProps={}
+        }
+        userProps.avatarDir = action.avatarDir;
+      }
 
       return {
         ...state,
@@ -310,7 +316,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
   //
   //  ユーザ情報の更新
   //
-  //　ユーザ情報のうちuserは
+  //　ユーザ情報のうちuserはfirebase/authに、
   //  userPropsはfirestoreに書き込む
   //
 
@@ -321,10 +327,11 @@ export default function AuthProvider({ firebase, firestore, children }) {
         photoURL: data.photoURL,
       })
     }
-    if (data.backgroundColor) {
+    if (data.backgroundColor || data.avatarDir) {
       const docRef = doc(firestore, "users", uid);
       setDoc(docRef, {
-        backgroundColor: data.backgroundColor
+        backgroundColor: data.backgroundColor,
+        avatarDir: data.avatarDir
       });
     }
     dispatch({
@@ -336,7 +343,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
   return (
     <AuthContext.Provider
       value={{
-        photoURL: state.user?.photoURL,
+        avatarDir: state.userProps?.avatarDir,
         displayName: state.user?.displayName,
         uid: state.usre?.uid,
         handleSignOff: handleSignOff

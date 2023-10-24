@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useStaticQuery, graphql } from "gatsby";
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import CustomInput from './CustomInput';
 import AccountIcon from '@mui/icons-material/AccountCircle';
 import Button from '@mui/material/Button';
+
+import CustomInput from './CustomInput';
+import AvatarSelector from './AvatarSelector';
+import ColorPicker from './ColorPicker';
+import UserPanel from '../Panel/UserPanel';
 
 export default function UserSettingsDialog({
   authState,
@@ -13,19 +17,38 @@ export default function UserSettingsDialog({
   handleSignOff,
   handleChangeUserSettings
 }) {
+
+  const data = useStaticQuery(graphql`
+    query {
+      site {
+        siteMetadata {
+          backgroundColorPalette
+        }
+      }
+    }
+  `);
+
+  const palette = data.site.siteMetadata.backgroundColorPalette;
+
   const user = authState.user;
+  const userProps = authState.userProps;
   const [displayName, setDisplayName] = useState(user.displayName);
-  const [photoURL, setPhotoURL] = useState(user.photoURL);
-  const [backgroundColor, setBackgroundColor] = useState(authState.userProps?.backgroundColor);
+  const [avatarDir, setAvatarDir] = useState(userProps?.avatarDir);
+  const [backgroundColor, setBackgroundColor] = useState(userProps?.backgroundColor || palette[0]);
+
+  const dataInvalid = (
+    !displayName && displayName !== "" &&
+    !avatarDir && avatarDir !== "" );
 
   function handleSubmit() {
     handleChangeUserSettings({
-      displayName: displayName === "" ? null : displayName,
-      photoURL: photoURL === "" ? null : photoURL,
-      backgroundColor: backgroundColor === "" ? null : backgroundColor
+      displayName: displayName,
+      avatarDir: avatarDir,
+      backgroundColor: backgroundColor
     })
     authDispatch({ type: 'ready' });
   }
+
   return (
     <Box
       sx={{
@@ -49,37 +72,63 @@ export default function UserSettingsDialog({
           flexDirection: 'column',
           alignItems: 'center'
         }}>
-        <CustomInput
-          title="ユーザ名"
-          value={displayName}
-          onChange={e => { setDisplayName(e.target.value) }}
-          startIcon={<AccountIcon />}
-        />
-      </Box>
-      <Box>
-        {authState.subState}
-      </Box>
-      <Box
-        sx={{ p: 1 }}
-      >
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          type="submit"
+        <Box>
+          <UserPanel
+            user={{
+              backgroundColor: backgroundColor,
+              avatarDir: avatarDir,
+            }}
+            panelWidth={200}
+          />
+        </Box>
+        <Box>
+          <AvatarSelector 
+            avatarDir={avatarDir}
+            handleChangeAvatarDir={setAvatarDir}
+          />
+        </Box>
+        <Box>
+          <CustomInput
+            title="ユーザの名前"
+            value={displayName}
+            onChange={e => { setDisplayName(e.target.value) }}
+            startIcon={<AccountIcon />}
+          />
+        </Box>
+        <Box>
+          <ColorPicker
+            title="背景色"
+            palette={palette}
+            value={backgroundColor}
+            handleChangeValue={c => { setBackgroundColor(c) }}
+          />
+        </Box>
+        <Box>
+          {authState.subState}
+        </Box>
+        <Box
+          sx={{ p: 1 }}
         >
-          OK
-        </Button>
-      </Box>
-      <Box
-        sx={{ p: 1 }}
-      >
-        <Button
-          variant="text"
-          size="small"
-          onClick={handleSignOff}
+          <Button
+            variant="contained"
+            disabled={dataInvalid}
+            onClick={handleSubmit}
+            type="submit"
+          >
+            OK
+          </Button>
+        </Box>
+        <Box
+          sx={{ p: 1 }}
         >
-          サインオフ
-        </Button>
+          <Button
+            variant="text"
+            size="small"
+            onClick={handleSignOff}
+          >
+            サインオフ
+          </Button>
+        </Box>
       </Box>
     </Box>
   )

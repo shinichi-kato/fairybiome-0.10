@@ -1,7 +1,9 @@
-import * as React from 'react';
+import React from 'react';
+import { graphql } from 'gatsby'
 import Container from '@mui/material/Container';
 import AuthProvider from '../components/Auth/AuthProvider';
 import useFirebase from "../useFirebase";
+import BiomebotProvider from '../biomebot-0.10/BiomebotProvider';
 
 
 export default function Index() {
@@ -16,15 +18,29 @@ export default function Index() {
         firebase={firebase}
         firestore={firestore}
       >
-        app
+        <BiomebotProvider
+          firestore={firestore}
+        >
+          app
+        </BiomebotProvider>
       </AuthProvider>
     </Container>
 
   );
 }
 
-export const Head = () =>
+export const Head = ({data}) =>
   <>
-    <html lang="jp" />
-    <title>妖精バイオーム</title>
+    <html lang="ja" />
+    <title>{data.site.siteMetadata.title}</title>
   </>
+
+export const query = graphql`
+query IndexPageQuery {
+    site {
+      siteMetadata {
+        title
+      }
+    }
+ }
+`;

@@ -8,9 +8,39 @@ biomebot-0.10
 複数 web worker として動作させ、それらの取りまとめを別の web worker が行う構成とし、
 前者をpart、後者をcentralと呼ぶ。アプリケーションのAPIはcentralが担当する。
 
+## 初期化の手順
+チャットボットは未定義状態でスタートする。
+ユーザからのメッセージを受け取ったらそれをトリガとしていずれかのチャットボットを
+firestoreからローカルのdexieDBにダウンロードする要求をチャットボットが行う。
+dexieDB上にスクリプトがすでに存在していた場合、類似度行列を計算し、dexieDB上に
+保存する。類似度行列が存在した場合、返答を行う。
+
+action名        response
+必要フラグ 　   matrixize
+処理            返答の開始        
+
+action名        matrixize
+必要フラグ      download
+処理            dexieDBのスクリプトで類似度行列を計算しメモリに保持
+
+action名        download
+必要フラグ      update_script
+処理            ユーザ入力を参考に決めたスクリプトをfirestoreからdexieDBにコピー
+
+action名        update_script
+必要フラグ      なし
+処理            firestore上にチャットボットの最新データ(.json)をコピー
+
+これらの制約充足の管理にはeffectsを使う。
+effects['matrix_load'] = 'req' リクエストされた
+effects['matrix_load'] = 'done' 完了した
+
+
 ## API
 チャットボットモジュールは web worker として設計されており、postMessage()を利用して
 メインスレッドのスクリプトと通信する。
+
+
 
 ### 初期化
 投入メッセージ { type: 'init', name }
