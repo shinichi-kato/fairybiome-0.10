@@ -1,25 +1,13 @@
 import React from 'react';
-import { useStaticQuery, graphql } from "gatsby"
 
 import ImageList from '@mui/material/ImageList';
 import ImageListItem from '@mui/material/ImageListItem';
 
-export default function AvatarSelector({ avatarDir, handleChangeAvatarDir }) {
-  const data = useStaticQuery(graphql`
-  query {
-    allFile(filter: {sourceInstanceName: {eq: "userAvatar"}, name: {eq: "peace"}}) {
-      nodes {
-        relativeDirectory
-      }
-    }
-  }
-  `);
-
-  const dirs = data.allFile.nodes.map(node=>(node.relativeDirectory));
+export default function AvatarSelector({ avatarDir, avatarDirs, handleChangeAvatarDir }) {
 
   return (
-    <ImageList sx={{ width: 500, height: 170 }} cols={3} rowHeight={164}>
-      {dirs.map((dir) => (
+    <ImageList sx={{ width: 300, height: 170 }} cols={3} rowHeight={164}>
+      {avatarDirs.map((dir) => (
         <ImageListItem key={dir}
           onClick={()=>{handleChangeAvatarDir(dir)}}
           sx={{

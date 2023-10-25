@@ -80,6 +80,7 @@ export default function AuthDialog({
       anchor="bottom"
       open={state.open}
       elevation={0}
+      hideBackdrop={state.open}
       sx={{ maxWidth: 'xs', backgroundColor: 'transparent', px: 'auto' }}
       PaperProps={{
         sx: { width: 'xs', backgroundColor: 'drawerBg.main', square: true }

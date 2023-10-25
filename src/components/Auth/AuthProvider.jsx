@@ -14,19 +14,17 @@ AuthProvider
   ----------------------------------------------------------------------
 
   AuthProviderではfirebaseのauth周りとアプリで使用するユーザ設定を
-  管理する。firebaseのuserオブジェクトでは以下の3パラメータを管理する。
-  このうちphotoURLには吹き出し横に表示するアイコンのURLを指定し、
-  同じディレクトリにはユーザのアバターが格納されているものとみなす。
+  管理する。firebaseのuserオブジェクトでは以下のパラメータを管理する。
 
   user: {
     email
-    displayName
-    photoURL
   }
 
   上記に加え、追加で下記のデータをfirestoreでユーザごとに管理する
   userProps: {
-    backgroundColor
+    displayName,
+    backgroundColor,
+    avatarDir,
   }
 
 */
@@ -36,7 +34,6 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile,
   getAuth, signOut
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -48,6 +45,7 @@ export const AuthContext = createContext();
 const MESSAGE_MAP = {
   'configuration-not-found': 'firebaseのmail/password認証を有効にしてください',
   'invalid-login-credentials': 'ユーザが登録されていません',
+  'email-already-in-use': 'ユーザは登録済みです',
   'Missing or insufficient permissions': 'firestoreのルールを読み書き可能に変更してください',
 };
 
@@ -80,6 +78,8 @@ function reducer(state, action) {
     case 'authStateChange': {
       const u = action.user;
       const p = action.userProps || state.userProps;
+      console.log(action)
+
       if (!u) {
         return {
           auth: state.auth,
@@ -144,11 +144,14 @@ function reducer(state, action) {
       let user = state.user;
       let userProps = state.userProps;
 
-      if (action.displayName) {
-        user.displayName = action.displayName
-      }
       if (action.photoURL) {
         user.photoURL = action.photoURL
+      }
+      if (action.displayName) {
+        if (!userProps) {
+          userProps = {}
+        }
+        userProps.displayName = action.displayName;
       }
       if (action.backgroundColor) {
         if (!userProps) {
@@ -157,8 +160,8 @@ function reducer(state, action) {
         userProps.backgroundColor = action.backgroundColor;
       }
       if (action.avatarDir) {
-        if(!userProps) {
-          userProps={}
+        if (!userProps) {
+          userProps = {}
         }
         userProps.avatarDir = action.avatarDir;
       }
@@ -245,12 +248,14 @@ export default function AuthProvider({ firebase, firestore, children }) {
   //  ここで取得する。
 
   useEffect(() => {
-    if (uid) {
+    if (uid && state.user) {
       const docRef = doc(firestore, "users", uid);
+    
       getDoc(docRef).then(snap => {
         if (snap.exists()) {
           dispatch({
             type: 'authStateChange',
+            user: state.user,
             userProps: snap.data()
           })
         }
@@ -261,7 +266,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
         })
       })
     }
-  }, [uid, firestore]);
+  }, [uid, firestore, state.user]);
 
   // -----------------------------------------------------------
   //
@@ -274,6 +279,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
     dispatch({ type: 'waiting' });
     createUserWithEmailAndPassword(state.auth, email, password)
       // 成功した場合はonAuthStateChangedがトリガされる
+      .then()
       .catch((error) => {
         dispatch({
           type: 'error',
@@ -291,9 +297,14 @@ export default function AuthProvider({ firebase, firestore, children }) {
   function handleSignIn(email, password) {
     dispatch({ type: 'waiting' });
     signInWithEmailAndPassword(state.auth, email, password)
+      .then(userCredential => {
+        dispatch({
+          type: 'authStateChange',
+          user: userCredential.user
+        });
+      })
       // 成功した場合はonAuthStateChangedがトリガされる
       .catch((error) => {
-        console.log(error.message);
         dispatch({
           type: 'error',
           errorCode: error.message
@@ -316,23 +327,19 @@ export default function AuthProvider({ firebase, firestore, children }) {
   //
   //  ユーザ情報の更新
   //
-  //　ユーザ情報のうちuserはfirebase/authに、
-  //  userPropsはfirestoreに書き込む
   //
 
   function handleChangeUserSettings(data) {
-    if (data.displayName || data.photoURL) {
-      updateProfile(state.auth.currentUser, {
-        displayName: data.displayName,
-        photoURL: data.photoURL,
-      })
-    }
-    if (data.backgroundColor || data.avatarDir) {
+    if (data.backgroundColor || data.avatarDir || data.displayName) {
       const docRef = doc(firestore, "users", uid);
       setDoc(docRef, {
         backgroundColor: data.backgroundColor,
-        avatarDir: data.avatarDir
-      });
+        avatarDir: data.avatarDir,
+        displayName: data.displayName
+      })
+        .catch(error => {
+          dispatch({ type: 'error', errorCode: error.message })
+        });
     }
     dispatch({
       type: 'changeUserSettings',

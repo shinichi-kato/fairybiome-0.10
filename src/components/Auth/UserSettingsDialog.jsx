@@ -25,22 +25,29 @@ export default function UserSettingsDialog({
           backgroundColorPalette
         }
       }
+      allFile(filter: {sourceInstanceName: {eq: "userAvatar"}, name: {eq: "peace"}}) {
+        nodes {
+          relativeDirectory
+        }
+      }
     }
   `);
 
   const palette = data.site.siteMetadata.backgroundColorPalette;
+  const avatarDirs = data.allFile.nodes.map(node => (node.relativeDirectory));
 
   const user = authState.user;
   const userProps = authState.userProps;
-  const [displayName, setDisplayName] = useState(user.displayName);
-  const [avatarDir, setAvatarDir] = useState(userProps?.avatarDir);
+  const [displayName, setDisplayName] = useState(user?.displayName);
+  const [avatarDir, setAvatarDir] = useState(userProps?.avatarDir || avatarDirs[0]);
   const [backgroundColor, setBackgroundColor] = useState(userProps?.backgroundColor || palette[0]);
 
   const dataInvalid = (
     !displayName && displayName !== "" &&
-    !avatarDir && avatarDir !== "" );
+    !avatarDir && avatarDir !== "");
 
-  function handleSubmit() {
+  function handleSubmit(e) {
+    e.preventDefault()
     handleChangeUserSettings({
       displayName: displayName,
       avatarDir: avatarDir,
@@ -64,7 +71,9 @@ export default function UserSettingsDialog({
       <Typography component="h1" variant="h5">
         ユーザ設定
       </Typography>
-      <Box component="form" onSubmit={handleSubmit}
+      <Box component="form"
+        onSubmit={handleSubmit}
+        id="user-settings"
         sx={{
           m: 1,
           width: 'xs',
@@ -82,7 +91,8 @@ export default function UserSettingsDialog({
           />
         </Box>
         <Box>
-          <AvatarSelector 
+          <AvatarSelector
+            avatarDirs={avatarDirs}
             avatarDir={avatarDir}
             handleChangeAvatarDir={setAvatarDir}
           />
@@ -90,6 +100,7 @@ export default function UserSettingsDialog({
         <Box>
           <CustomInput
             title="ユーザの名前"
+            id="userSettings-name"
             value={displayName}
             onChange={e => { setDisplayName(e.target.value) }}
             startIcon={<AccountIcon />}
@@ -112,7 +123,6 @@ export default function UserSettingsDialog({
           <Button
             variant="contained"
             disabled={dataInvalid}
-            onClick={handleSubmit}
             type="submit"
           >
             OK

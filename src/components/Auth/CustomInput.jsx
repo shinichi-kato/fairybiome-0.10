@@ -4,7 +4,8 @@ import Typography from '@mui/material/Typography';
 import Input from '@mui/material/InputBase';
 import InputAdornment from '@mui/material/InputAdornment';
 
-export default function CustomInput({ title, value, onChange, startIcon, type = 'text' }) {
+export default function CustomInput({ title, value, 
+  onChange, startIcon, autoComplete, type = 'text' }) {
   return (
     <Box sx={{ p: 1 }}>
       <Box>
@@ -21,6 +22,7 @@ export default function CustomInput({ title, value, onChange, startIcon, type = 
           }}
           required
           type={type}
+          autoComplete={autoComplete}
           value={value}
           onChange={onChange}
           startAdornment={

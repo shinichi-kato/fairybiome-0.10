@@ -25,12 +25,13 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
     passwordUnmatched || password1 === "" || email === "" ||
     authState.subState === 'waiting';
 
-  function signUp(e) {
-    handleSignUp(email, password1);
-  }
-
-  function signIn(e) {
-    handleSignIn(email, password1);
+  function signUpSignIn(e) {
+    // e.preventDefault();
+    if(page === 'openSignUp'){
+      handleSignUp(email, password1);
+    } else {
+      handleSignIn(email, password1);
+    }
   }
 
   return (
@@ -52,7 +53,8 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
         {page === 'openSignUp' ? "ユーザ登録" : "サインイン"}
       </Typography>
 
-      <Box component="form" onSubmit={handleSignUp}
+      <Box component="form" 
+        onSubmit={signUpSignIn}
         sx={{
           m: 1,
           width: 'xs',
@@ -63,12 +65,15 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
         <CustomInput
           title="Email"
           value={email}
+          type="email"
+          autoComplete="email"
           onChange={e => { setEmail(e.target.value) }}
           startIcon={<EmailIcon />}
         />
         <CustomInput
           title="パスワード"
           type="password"
+          autoComplete="current-password"
           value={password1}
           onChange={e => { setPassword1(e.target.value) }}
           startIcon={<KeyIcon />}
@@ -79,6 +84,7 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
               title="パスワード(確認)"
               value={password2}
               type="password"
+              autoComplete="new-password"
               onChange={e => { setPassword2(e.target.value) }}
               startIcon={<KeyIcon />}
             />
@@ -99,7 +105,8 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
             </Button>
             <Button
               variant="contained"
-              onClick={signUp}
+              disabled={submitNotReady}
+              type="submit"
             >
               ユーザ登録
             </Button>
@@ -112,7 +119,6 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
             <Button
               variant="text"
               disabled={submitNotReady}
-              type="submit"
               onClick={() => authDispatch({ type: 'signUp' })}
             >
               ユーザ登録
@@ -120,7 +126,7 @@ export default function SignUpSignInDialog({ state, authState, authDispatch, han
             <Button
               variant="contained"
               disabled={submitNotReady}
-              onClick={signIn}
+              type="submit"
             >
               サインイン
             </Button>
