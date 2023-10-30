@@ -23,6 +23,19 @@ module.exports = {
         path: `${__dirname}/static/user/avatar`,
       },
     },
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        name: `botScheme`,
+        path: `${__dirname}/static/chatbot/scheme`,
+      }
+    },
+    {
+      resolve: `gatsby-transformer-json`,
+      options: {
+        typeName: `Json`,
+      },
+    },
   ],
   siteMetadata: {
     title: '妖精バイオーム',

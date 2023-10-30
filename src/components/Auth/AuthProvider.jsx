@@ -250,7 +250,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
   useEffect(() => {
     if (uid && state.user) {
       const docRef = doc(firestore, "users", uid);
-    
+
       getDoc(docRef).then(snap => {
         if (snap.exists()) {
           dispatch({

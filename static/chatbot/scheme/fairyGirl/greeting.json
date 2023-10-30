@@ -1,0 +1,20 @@
+{
+    "encoder": "BasicEncoder",
+    "decoder": "BasicDecoder",
+    "avatar": "cheer",
+    "response": {
+        "minIntensity": 0.3,
+        "retention": 0.5
+    },
+    "script": [
+        {
+            "in": ["{!greeting}こんにちは"],
+            "out": ["こんにちは！"]
+        },
+        {
+            "in": ["{!greeting}こんばんは"],
+            "out": ["こんばんは！"]
+        }
+    ]
+
+}
