@@ -38,6 +38,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
+import Landing from '../Landing/Landing';
 import AuthDialog from './AuthDialog';
 
 export const AuthContext = createContext();
@@ -352,11 +353,16 @@ export default function AuthProvider({ firebase, firestore, children }) {
       value={{
         avatarDir: state.userProps?.avatarDir,
         displayName: state.user?.displayName,
-        uid: state.usre?.uid,
+        uid: state.user?.uid,
         handleSignOff: handleSignOff
       }}
     >
-      {children}
+      {(state.user && state.user.uid) 
+        ? 
+        children 
+        :
+         <Landing />
+      }
       <AuthDialog
         authState={state}
         authDispatch={dispatch}

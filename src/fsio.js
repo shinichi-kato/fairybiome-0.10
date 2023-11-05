@@ -16,19 +16,19 @@ export async function isExistUserChatbot(firestore, uid) {
   return botSnap.exists();
 }
 
-export async function uploadScheme(firestore, uid, data){
+export async function uploadScheme(firestore, botId, data){
   // json形式で取得したdataをfirestoreに書き込む
-  const botRef = doc(firestore, 'chatbot', uid);
+  const botRef = doc(firestore, 'chatbot', botId);
 
   for(let fn in data){
     if(fn === 'main'){
       await setDoc(botRef, {
        ...data[fn],
-       ownerId: uid 
+       ownerId: botId 
       })
     } else {
       const partRef = collection(botRef, 'part');
-      await setDoc(doc(partRef, fn, data[fn]));
+      await setDoc(doc(partRef, fn), data[fn]);
     }
   }
 }
