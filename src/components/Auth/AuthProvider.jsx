@@ -351,8 +351,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
   return (
     <AuthContext.Provider
       value={{
-        avatarDir: state.userProps?.avatarDir,
-        displayName: state.user?.displayName,
+        userProps: state.userProps,
         uid: state.user?.uid,
         handleSignOff: handleSignOff
       }}
@@ -365,6 +364,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
       }
       <AuthDialog
         authState={state}
+        user={state.userProps}
         authDispatch={dispatch}
         handleSignOff={handleSignOff}
         handleSignUp={handleSignUp}

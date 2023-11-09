@@ -4,7 +4,9 @@ import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 
 
-export default function MainMenu({ displayName, handleToUserRoom, handleReset }) {
+export default function MainMenu({ 
+  displayName, handleToUserRoom, handleReset
+ }) {
   return (
     <Box
       sx={{

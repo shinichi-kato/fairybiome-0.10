@@ -38,7 +38,7 @@ function reducer(state, action) {
       return {
         futurePage: null,
         presentPage: state.futurePage,
-        open: true,
+        open: false,
         unmountOnExit: false
       }
     }
@@ -80,7 +80,6 @@ export default function AuthDialog({
       anchor="bottom"
       open={state.open}
       elevation={0}
-      hideBackdrop={state.open}
       sx={{ maxWidth: 'xs', backgroundColor: 'transparent', px: 'auto' }}
       PaperProps={{
         sx: { width: 'xs', backgroundColor: 'drawerBg.main', square: true }

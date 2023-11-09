@@ -4,6 +4,7 @@ import Container from '@mui/material/Container';
 import AuthProvider from '../components/Auth/AuthProvider';
 import useFirebase from "../useFirebase";
 import BiomebotProvider from '../biomebot-0.10/BiomebotProvider';
+import ChatRoom from '../components/ChatRoom';
 
 
 export default function Index() {
@@ -21,7 +22,10 @@ export default function Index() {
         <BiomebotProvider
           firestore={firestore}
         >
-          app
+          <ChatRoom
+            firestore={firestore}
+            
+          />
         </BiomebotProvider>
       </AuthProvider>
     </Container>

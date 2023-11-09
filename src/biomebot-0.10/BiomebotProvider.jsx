@@ -6,12 +6,25 @@ Biomebot
 初期状態ではチャットボットは未定義状態で、ユーザから声をかけられたことをトリガーと
 してチャットボットがランダムに生成され、会話を始める。
 
+state             内容
+---------------------------------------------------------------
+botId             fsとdbで識別するのに使うId。
+displayName       表示名。memory:_BOT_NAME_を利用
+backgroundColor   背景色
+avatarDir         avatarの親ディレクトリ
+botState          botの状態。${avatarDir}/${botState}.svgがavatar
+numOfparts        partの数
+flags             状態管理フラグ
+-----------------------------------------------------------------
+
 botState        Avatar例        内容
 ---------------------------------------------------------------
 unload        なし            初期状態
-update_script パーティクル    firestore上のスクリプトを最新に
-download      光の玉          firestoreから読み込み ... avatarDirが"default"         
-matrixize     光の玉(複数)    tfidf行列を計算。
+uploading     パーティクル    schmeをfb,dbに読み込む
+loading       光の玉(小)      workerがdbからschemeを読む         
+loaded        光の玉(中)      読み込み完了
+deploying     光の玉(大)      tfidf行列を計算開始。
+deployed      光るシルエット  tfidf行列を計算終了
 response      視線が上の方    入力を受付け返答を生成中
 asleep        寝てる          会話中の状態
 awake         目覚めた        会話中の状態
@@ -44,7 +57,7 @@ import CentralWorker from './worker/central.worker';
 import PartWorker from './worker/part.worker';
 
 
-export const BotContext = createContext();
+export const BiomebotContext = createContext();
 
 const chatbotsQuery = graphql`
 query {
@@ -91,9 +104,9 @@ function getBotName2RelativeDir(data) {
 const initialState = {
   botId: null,
   displayName: "",
-  backgroundColor: "",
+  backgroundColor: "#cccccc",
   avatarDir: "default",
-  botState: "init",
+  botState: "unload",
   numOfparts: 0,
   flags: {},
 }
@@ -104,9 +117,9 @@ function reducer(state, action) {
   switch (action.type) {
     case 'load': {
       return {
-        ...state,
+        ...initialState,
         botId: action.botId,
-        botState: 'loading0',
+        botState: 'loading',
         flags: {
           load: 'req',
           centralLoaded: 0,
@@ -119,7 +132,10 @@ function reducer(state, action) {
       const completed = action.numOfParts === state.flags.partLoaded;
       return {
         ...state,
-        botState: completed ? 'loaded' : 'loading1',
+        botState: completed ? 'loaded' : 'loading',
+        avatarDir: action.avatarDir,
+        backgroundColor: action.backgroundColor,
+        displayName: action.displayName,
         flags: {
           ...state.flags,
           centralLoaded: 1,
@@ -131,7 +147,8 @@ function reducer(state, action) {
       const completed = action.numOfParts === state.flags.partDeployed;
       return {
         ...state,
-        botState: completed ? 'deployed' : 'deploying1',
+        botState: completed ? 'deployed' : 'deploying',
+
         flags: {
           ...state.flags,
           centralDeployed: 1,
@@ -145,7 +162,7 @@ function reducer(state, action) {
         action.numOfParts === state.flags.partLoaded + 1;
       return {
         ...state,
-        botState: completed ? 'loaded' : 'loading2',
+        botState: completed ? 'loaded' : 'loading',
         flags: {
           ...state.flags,
           partLoaded: state.flags.partLoaded + 1,
@@ -160,7 +177,7 @@ function reducer(state, action) {
 
       return {
         ...state,
-        botState: completed ? 'deployed' : 'deploying2',
+        botState: completed ? 'deployed' : 'deploying',
         flags: {
           ...state.flags,
           partDeployed: state.flags.partDeployed + 1,
@@ -176,13 +193,24 @@ function reducer(state, action) {
       }
     }
 
-    case 'PartNotFound': {
+    case 'partNotFound': {
       return {
         ...state,
         botState: `error ${action.partName} not found`,
         flags: {
           ...state.flags,
           load: null
+        }
+      }
+    }
+
+    case 'upload_scheme_req': {
+      return {
+        ...state,
+        botState: 'uploading',
+        flags: {
+          ...state.flags,
+          upload_scheme: 'req'
         }
       }
     }
@@ -235,12 +263,12 @@ export default function BiomebotProvider({ firestore, children }) {
     if (message.text != null) {
       // workerが起動していなければ
       if (flags.deploy === 'done') {
-        channelRef.current.postMessage({type:'userPost', message:message});
+        channelRef.current.postMessage({ type: 'userPost', message: message });
       }
       else {
-        if(flags.deploy !== 'req'){
-          dispatch({type: 'flag', flags: {deploy: 'req'}})
-        } 
+        if (flags.deploy !== 'req') {
+          dispatch({ type: 'flag', flags: { deploy: 'req' } })
+        }
       }
     }
   }, [message, flags.deploy]);
@@ -287,7 +315,18 @@ export default function BiomebotProvider({ firestore, children }) {
             console.log(event.data);
             const type = event.data.type;
             // centralLoaded, centralNotFound, centralDeployedをディスパッチ
-            dispatch({ type: type, numOfParts: numOfParts });
+            switch (type) {
+              case 'centralLoaded': {
+                dispatch({
+                  ...event.data,
+                  numOfParts: numOfParts
+                });
+                break;
+              }
+              default:
+                dispatch({ type: type, numOfParts: numOfParts });
+
+            }
           }
           cw.postMessage({
             type: 'deploy',
@@ -296,11 +335,9 @@ export default function BiomebotProvider({ firestore, children }) {
           centralWorkerRef.current = cw;
         })
 
-        // deploy: 'done'はmessageで受取
-
       } else {
         if (flags.upload_scheme !== 'req') {
-          dispatch({ type: 'flag', flags: { upload_scheme: 'req' } });
+          dispatch({ type: 'upload_scheme_req' });
         }
       }
 
@@ -354,35 +391,39 @@ export default function BiomebotProvider({ firestore, children }) {
           // firestoreに上書き
           await uploadScheme(firestore, botId, data);
 
-          // dexieに上書き
-          await db.saveScheme(botId, data);
         }
         else {
           // firestore上にあればそれを使用
           data = await downloadScheme(firestore, botId);
-          // dexieに書き込む
-          await db.saveScheme(botId, data);
+
         }
+
+        // dexieに書き込む
+        await db.saveScheme(botId, data);
 
         dispatch({ type: 'flag', flags: { upload_scheme: 'done' } });
       })();
 
-      // フラグの読み込みは未実装
+      // 永続フラグの読み込みは未実装
 
 
     }
 
   }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, message]);
 
-  return (
-    <BotContext.Provider
-      value={{
-        displayName: state.displayName,
+  function postUserMessage(message) {
+    channelRef.postMessage({ type: 'userMessage', message: message });
+  }
 
+  return (
+    <BiomebotContext.Provider
+      value={{
+        state:state,
+        postUserMessage: postUserMessage,
       }}
     >
       {children}
-    </BotContext.Provider>
+    </BiomebotContext.Provider>
 
   )
 }

@@ -44,6 +44,8 @@ class Scheme {
     this.response = { ...data.response };
     this.memory = { ...data.memory };
 
+    this.displayName = this.memory["{BOT_NAME}"]
+
   }
 }
 
@@ -57,7 +59,12 @@ onmessage = function (event) {
       // dbからロードし、行列計算
       (async ()=>{ 
         scheme.load(botId); 
-        postMessage({type:'centralLoaded'});
+        postMessage({
+          type:'centralLoaded',
+          avatarDir: this.avatarDir,
+          backgroundColor: this.backgroundColor,
+          displayName: this.displayName,
+        });
 
         // postMessage({type:'centralDeployed'});
       })();

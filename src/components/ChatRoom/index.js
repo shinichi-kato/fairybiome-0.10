@@ -1,13 +1,19 @@
-import React, {useState} from 'react';
+import React, {useState,useContext} from 'react';
 import { AuthContext } from "../Auth/AuthProvider";
+import MainMenu from './MainMenu';
+import UserRoom from './UserRoom';
 import {db} from '../../dbio';
 
-export default function ChatRoom() {
+export default function ChatRoom({firestore}) {
   const auth = useContext(AuthContext);
   const [page, setPage] = useState('menu');
   
   function handleToUserRoom(e){
     setPage('room');
+  }
+
+  function handleToMainMenu(){
+    setPage('menu');
   }
 
   function handleReset(e){
@@ -19,7 +25,7 @@ export default function ChatRoom() {
       {
         page === 'menu' && 
         <MainMenu
-          displayName={auth.displayName}
+          displayName={auth.userProps.displayName}
           handleToUserRoom={handleToUserRoom}
           handleReset={handleReset}
         />
@@ -28,6 +34,7 @@ export default function ChatRoom() {
         page === 'room' &&
         <UserRoom
           user={auth.user}
+          handleToMainMenu={handleToMainMenu}
         />
       }
     </>
