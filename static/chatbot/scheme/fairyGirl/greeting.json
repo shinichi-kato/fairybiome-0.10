@@ -7,14 +7,12 @@
         "retention": 0.5
     },
     "script": [
-        {
-            "in": ["{!greeting}こんにちは"],
-            "out": ["こんにちは！"]
-        },
-        {
-            "in": ["{!greeting}こんばんは"],
-            "out": ["こんばんは！"]
-        }
+        "with {!greeting}",
+        "user こんにちは",
+        "cheer 今日は！{+greeting}",
+        "",
+        "user こんばんは",
+        "cheer こんばんは！{+greeting}"
     ]
 
 }

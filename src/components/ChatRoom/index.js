@@ -1,31 +1,31 @@
-import React, {useState,useContext} from 'react';
+import React, { useState, useContext } from 'react';
 import { AuthContext } from "../Auth/AuthProvider";
 import MainMenu from './MainMenu';
 import UserRoom from './UserRoom';
-import {db} from '../../dbio';
+import { db } from '../../dbio';
 
-export default function ChatRoom({firestore}) {
+export default function ChatRoom({ firestore }) {
   const auth = useContext(AuthContext);
   const [page, setPage] = useState('menu');
-  
-  function handleToUserRoom(e){
+
+  function handleToUserRoom(e) {
     setPage('room');
   }
 
-  function handleToMainMenu(){
+  function handleToMainMenu() {
     setPage('menu');
   }
 
-  function handleReset(e){
-    db.clear(auth.uid).then(()=>{setPage('room')});
+  function handleReset(e) {
+    db.clear(auth.uid).then(() => { setPage('room') });
   }
 
   return (
     <>
       {
-        page === 'menu' && 
+        page === 'menu' &&
         <MainMenu
-          displayName={auth.userProps.displayName}
+          displayName={auth.userProps?.displayName}
           handleToUserRoom={handleToUserRoom}
           handleReset={handleReset}
         />
@@ -33,7 +33,7 @@ export default function ChatRoom({firestore}) {
       {
         page === 'room' &&
         <UserRoom
-          user={auth.user}
+          firestore={firestore}
           handleToMainMenu={handleToMainMenu}
         />
       }

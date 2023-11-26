@@ -1,7 +1,7 @@
 {
     "description": "説明",
     "author": "system",
-    "avatarDir": "default",
+    "avatarDir": "fairy-girl",
     "backgroundColor": "#de53a1",
     "interval": {
         "max":  5000,

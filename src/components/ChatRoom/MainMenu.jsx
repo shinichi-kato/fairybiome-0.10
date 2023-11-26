@@ -1,12 +1,12 @@
 import React from 'react';
+import { withPrefix } from 'gatsby';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Avatar from '@mui/material/Avatar';
 
 
-export default function MainMenu({ 
+export default function MainMenu({
   displayName, handleToUserRoom, handleReset
- }) {
+}) {
   return (
     <Box
       sx={{
@@ -15,14 +15,25 @@ export default function MainMenu({
       }}
     >
       <Box>
-        LOGO
+        <img
+          src={withPrefix('/static/images/title.svg')}
+          alt="title"
+        />
       </Box>
-      <Box>
-        <Button
-          onClick={handleToUserRoom}
-        >
-          {displayName}の部屋に入る
-        </Button>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'row'
+        }}
+      >
+        <Box>
+          <Button
+            onClick={handleToUserRoom}
+          >
+            {displayName}の部屋に入る
+          </Button>
+        </Box>
+        {}
       </Box>
       <Box>
         <Button

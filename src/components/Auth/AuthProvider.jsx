@@ -364,6 +364,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
       }
       <AuthDialog
         authState={state}
+        uid={state.user?.uid}
         user={state.userProps}
         authDispatch={dispatch}
         handleSignOff={handleSignOff}

@@ -51,19 +51,19 @@ import { AuthContext } from '../components/Auth/AuthProvider';
 
 import { isExistUserChatbot, uploadScheme, downloadScheme } from '../fsio.js';
 import { db } from '../dbio.js';
-import { Message } from '../message';
+// import { Message } from '../message.js';
 
 import CentralWorker from './worker/central.worker';
 import PartWorker from './worker/part.worker';
 
+import {matrixize} from './worker/basic-encoder.js'
 
 export const BiomebotContext = createContext();
 
 const chatbotsQuery = graphql`
 query {
-  allFile(filter: {sourceInstanceName: {eq: "botScheme"}, ext: {eq: ".json"}}) {
+  allFile(filter: {sourceInstanceName: {eq: "botAvatar"}, ext: {eq: ".svg"}}) {
     nodes {
-      modifiedTime(formatString: "yyyy-MM-dd hh:mm:ss")
       relativeDirectory
       name
       sourceInstanceName
@@ -98,6 +98,19 @@ function getBotName2RelativeDir(data) {
     }
   })
 
+  return d;
+}
+
+function getAvatarNameDict(data){
+  let d = {};
+  data.allFile.nodes.forEach(n=>{
+    const dir=n.relativeDirectory;
+    if(dir in d){
+      d[dir].push(n.name);
+    }else{
+      d[dir]=[n.name];
+    }
+  });
   return d;
 }
 
@@ -234,44 +247,50 @@ function reducer(state, action) {
 export default function BiomebotProvider({ firestore, children }) {
   const auth = useContext(AuthContext);
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [message, setMessage] = useState(new Message());
+  const [msgQueue, setMsgQueue] = useState([]);
   const centralWorkerRef = useRef();
   const partWorkersRef = useRef([]);
-  const channelRef = useRef();
 
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const flags = state.flags;
 
+
   //-------------------------------------------
-  // channelの起動
+  // 制約充足：ユーザ発言の受付け
+  //
+  // chatbotがdeployされていたらメッセージをチャンネルにポストする
+  // 
+
+  function postUserMessage(message) {
+    if (flags.deploy === 'done') {
+      // workerが起動していればchannelにメッセージをポスト
+      centralWorkerRef.current.postMessage({ type: 'userPost', message: message });
+    } else {
+      // 起動前だったら起動。起動前に受け取ったメッセージは最後の
+      // 一つだけ記憶しておく
+      if (flags.deploy !== 'req') {
+        dispatch({ type: 'flag', flags: { deploy: 'req' } })
+      }
+      setMsgQueue([message]);
+    }
+  }
+
+  //-------------------------------------------
+  // 制約充足：queueの消費
+  //
+  // msgQueueにメッセージが残っていたらポストする
   //
 
   useEffect(() => {
-    channelRef.current = new BroadcastChannel('chat-channel');
-
-    return () => {
-      channelRef.current.close();
+    if (flags.deploy === 'done' && msgQueue.length !== 0) {
+      for (let m of msgQueue) {
+        // 一度にpostしてOKか？
+        centralWorkerRef.current.postMessage({ type: 'userPost', message: m });
+      }
+      setMsgQueue([]);
     }
 
-  }, []);
-
-  //-------------------------------------------
-  // 制約充足：発言
-  // 
-
-  useEffect(() => {
-    if (message.text != null) {
-      // workerが起動していなければ
-      if (flags.deploy === 'done') {
-        channelRef.current.postMessage({ type: 'userPost', message: message });
-      }
-      else {
-        if (flags.deploy !== 'req') {
-          dispatch({ type: 'flag', flags: { deploy: 'req' } })
-        }
-      }
-    }
-  }, [message, flags.deploy]);
+  }, [flags.deploy, msgQueue]);
 
   //-------------------------------------------
   // 制約充足：workerのdeploy
@@ -292,11 +311,12 @@ export default function BiomebotProvider({ firestore, children }) {
           const numOfParts = partNames.length;
 
           for (let pn of partNames) {
-            const pw = new PartWorker();
+            const pw = new PartWorker(matrixize);
             pw.onmessage = function (event) {
               const type = event.data.type;
               // partLoaded, partNotFound, partDeployedをディスパッチ
               dispatch({ type: type, numOfParts: numOfParts });
+
             }
 
             pw.postMessage({
@@ -316,7 +336,7 @@ export default function BiomebotProvider({ firestore, children }) {
             const type = event.data.type;
             // centralLoaded, centralNotFound, centralDeployedをディスパッチ
             switch (type) {
-              case 'centralLoaded': {
+              case 'centralDeployed': {
                 dispatch({
                   ...event.data,
                   numOfParts: numOfParts
@@ -347,7 +367,7 @@ export default function BiomebotProvider({ firestore, children }) {
       partWorkersRef.current.map(p => p.terminate());
     }
   },
-    [flags.deploy, flags.upload_scheme, message, auth.uid]);
+    [flags.deploy, flags.upload_scheme, auth.uid]);
 
   //-------------------------------------------------------------
   // 制約充足：schemeの選択とアップロード
@@ -368,11 +388,14 @@ export default function BiomebotProvider({ firestore, children }) {
           // なければランダムに選ぶ
           const botname2dir = getBotName2RelativeDir(chatbotsSnap);
           let dir;
-          for (let botname in botname2dir) {
-            if (message.contains(botname)) {
-              dir = botname2dir[botname];
-              break
+          if(msgQueue.length !== 0){
+            for (let botname in botname2dir) {
+              if (msgQueue[0].contains(botname)) {
+                dir = botname2dir[botname];
+                break
+              }
             }
+  
           }
           if (!dir) {
             const names = Object.keys(botname2dir)
@@ -389,7 +412,8 @@ export default function BiomebotProvider({ firestore, children }) {
           }
 
           // firestoreに上書き
-          await uploadScheme(firestore, botId, data);
+          const avatarDict=getAvatarNameDict();
+          await uploadScheme(firestore, botId, data,avatarDict);
 
         }
         else {
@@ -409,16 +433,14 @@ export default function BiomebotProvider({ firestore, children }) {
 
     }
 
-  }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, message]);
+  }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, msgQueue.length,msgQueue]);
 
-  function postUserMessage(message) {
-    channelRef.postMessage({ type: 'userMessage', message: message });
-  }
+
 
   return (
     <BiomebotContext.Provider
       value={{
-        state:state,
+        state: state,
         postUserMessage: postUserMessage,
       }}
     >

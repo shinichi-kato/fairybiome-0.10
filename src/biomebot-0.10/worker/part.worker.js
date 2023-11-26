@@ -1,21 +1,27 @@
+/*
+part worker
+==========================
+
+*/
+
 import { db } from '../../dbio.js';
 
+
 class Part {
-  constructor() {
-    this.encoder = null;
+  constructor(matrixizer) {
+    this.matrixizer = matrixizer;
     this.decoder = null;
     this.avatar = null;
     this.response = { minIntensity: 0, retention: 0.4 }
     this.script = [];
-    this.channel = new BroadcastChannel('chat-channel');
+    this.channel = new BroadcastChannel('biomebot');
     console.log("part Constructed")
 
   }
 
   async load(botId,partName){
     if (!await db.partExists(botId,partName)){
-      postMessage({type:'not-found'});
-      return;
+      return false;
     }
 
     const data = await db.loadPart(botId,partName);
@@ -24,8 +30,15 @@ class Part {
     this.avatar = data.avatar;
     this.response = {...data.response};
     this.script = [...data.script];
+    this.validAvatars = data.validAvatars
 
-    postMessage({type: 'loaded'});
+    return true;
+  }
+
+  async deploy(){
+    this.matrixizer(this.script);
+    
+
   }
 }
 
@@ -36,13 +49,20 @@ onmessage = function (event) {
   const botId = action.botId;
   switch (action.type) {
     case 'load': {
-      part.load(botId, action.partName);
-      postMessage({type:'partLoaded'});
-
-      // postMessage({type:'partDeployed'});
+      (async ()=>{
+        const result = await part.load(botId, action.partName);
+        if(result){
+          this.postMessage({type: 'partLoaded'});
+          await part.deploy();
+          this.postMessage({type: 'partDeployed'});
+        } else {
+          this.postMessage({type: 'partNotFound'});
+        }
+      })();
       break;
     }
+
     default:
-      throw new Error(`central: invalid action ${action.type}`);
+      throw new Error(`part: invalid action ${action.type}`);
   }
 }

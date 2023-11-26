@@ -5,9 +5,9 @@ exports.onCreateWebpackConfig = ({ actions: { replaceWebpackConfig }, getConfig 
     test: /\.worker\.js$/,
     use: {
       loader: 'worker-loader',
-      options: {
-        inline: "no-fallback"
-      }
+      // options: {
+      //   inline: "no-fallback"
+      // }
     }
   })
 

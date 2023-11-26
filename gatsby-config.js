@@ -26,6 +26,13 @@ module.exports = {
     {
       resolve: `gatsby-source-filesystem`,
       options: {
+        name: `botAvatar`,
+        path: `${__dirname}/static/chatbot/avatar`,
+      },
+    },
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
         name: `botScheme`,
         path: `${__dirname}/static/chatbot/scheme`,
       }
