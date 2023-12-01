@@ -165,7 +165,7 @@ function reducer(state, action) {
         flags: {
           ...state.flags,
           centralDeployed: 1,
-          deploy: completed ? 'done' : action.flags.deploy
+          deploy: completed ? 'done' : state.flags.deploy
         }
       }
     }
@@ -338,6 +338,7 @@ export default function BiomebotProvider({ firestore, children }) {
             switch (type) {
               case 'centralDeployed': {
                 dispatch({
+                  type: type,
                   ...event.data,
                   numOfParts: numOfParts
                 });
@@ -363,7 +364,7 @@ export default function BiomebotProvider({ firestore, children }) {
 
     }
     return () => {
-      centralWorkerRef.current.terminate();
+      centralWorkerRef.current?.terminate();
       partWorkersRef.current.map(p => p.terminate());
     }
   },

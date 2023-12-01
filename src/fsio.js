@@ -16,38 +16,43 @@ export async function isExistUserChatbot(firestore, uid) {
   return botSnap.exists();
 }
 
-export async function uploadScheme(firestore, botId, data,avatarDict){
+export async function uploadScheme(firestore, botId, data, avatarDict) {
   // json形式で取得したdataとavatarのリストをfirestoreに書き込む
-  const avatars=avatarDict[data.main.avatarDir];
+  const avatars = avatarDict[data.main.avatarDir];
   const botRef = doc(firestore, 'chatbot', botId);
 
 
-  for(let fn in data){
-    if(fn === 'main'){
+  for (let fn in data) {
+    if (fn === 'main') {
       await setDoc(botRef, {
-       ...data[fn],
-       ownerId: botId 
+        ...data[fn],
+        ownerId: botId
       })
     } else {
       const partRef = collection(botRef, 'part');
-      await setDoc(doc(partRef, fn), {...data[fn], validAvatars:avatars});
+      await setDoc(doc(partRef, fn), { ...data[fn], validAvatars: avatars });
     }
   }
 }
 
-export async function downloadScheme(firestore, uid){
+export async function downloadScheme(firestore, uid) {
   // firestoreに格納されたschemeを読み込み、
   // { name: content }という辞書にして返す
 
-  const botRef = doc(firestore, 'chatbot', uid);
-  const main = await getDoc(botRef);
+  let main = {}
   let parts = {}
+
+  const botRef = doc(firestore, 'chatbot', uid);
+  const mainSnap = await getDoc(botRef);
+  if(mainSnap.exists()){
+    main = mainSnap.data();
+  }
 
   const partsRef = collection(botRef, "parts");
   const snap = await getDocs(partsRef);
-  snap.forEach(doc=>{
+  snap.forEach(doc => {
     parts[doc.id] = doc.data()
   })
 
-  return {main:main, parts:parts};
+  return { main: main, parts: parts };
 }

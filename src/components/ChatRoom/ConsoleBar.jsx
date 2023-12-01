@@ -11,6 +11,11 @@ import InputBase from '@mui/material/InputBase';
 
 export default function ConsoleBar({
   text, handleChangeText, handleToBack, handleSend }) {
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    handleSend();
+  }
   return (
     <AppBar
       position="static"
@@ -31,6 +36,7 @@ export default function ConsoleBar({
             flexGrow: 1
           }}
           component="form"
+          onSubmit={handleSubmit}
         >
           <Box
             sx={{
@@ -63,7 +69,6 @@ export default function ConsoleBar({
             </IconButton>
           </Box>
         </Box>
-
       </Toolbar>
     </AppBar >
   )

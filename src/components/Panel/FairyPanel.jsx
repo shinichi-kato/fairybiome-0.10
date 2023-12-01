@@ -50,7 +50,7 @@ export default function FairyPanel({ state, panelWidth }) {
               width: width,
               height: height,
             }}
-            src={withPrefix(`${state.avatarDir}${state.botState}`)}
+            src={withPrefix(`/chatbot/avatar/${state.avatarDir}/${state.botState}.svg`)}
             alt={state.botState}
           />
         </Box>

@@ -103,16 +103,16 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
   // ユーザ発言のレンダリング
   //
 
-  function handleSend() {
-    const msg = Message('user', {
-      avatarDir: auth.avatarDir,
+  function handleSend(event) {
+    const user = auth.userProps;
+    const msg = new Message('user', {
+      avatarDir: user.avatarDir,
       avatar: 'peace',
-      speakerName: auth.displayName,
+      speakerName: user.displayName,
       speakerId: auth.uid,
-      backgroundColor: auth.backgroundColor,
+      backgroundColor: user.backgroundColor,
       text: text,
     })
-
     writeLog(msg);
     bot.postUserMessage(msg);
   }

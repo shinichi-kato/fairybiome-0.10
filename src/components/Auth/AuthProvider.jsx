@@ -244,8 +244,7 @@ export default function AuthProvider({ firebase, firestore, children }) {
 
   // ----------------------------------------------------------
   //  ユーザ追加情報の初期化
-  //  displayName, photoURLはuserオブジェクトを利用する。
-  //  それ以外のユーザ設定情報はfirestoreに格納しており、
+  //  email,password以外のユーザ設定情報はfirestoreに格納しており、
   //  ここで取得する。
 
   useEffect(() => {

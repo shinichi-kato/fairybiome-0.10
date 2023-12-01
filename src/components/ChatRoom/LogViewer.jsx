@@ -109,12 +109,12 @@ export default function LogViewer({ log, uid }) {
       {log.map(message => {
         const id = message.speakerId;
         if (!id) {
-          return <SystemMessage message={message} />
+          return <SystemMessage key={message.id} message={message} />
         }
         else if (id === uid) {
-          return <RightBalloon message={message} />
+          return <RightBalloon key={message.id} message={message} />
         }else {
-          return <LeftBalloon message={message} />
+          return <LeftBalloon key={message.id} message={message} />
         }
       })}
 

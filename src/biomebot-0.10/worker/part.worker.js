@@ -62,6 +62,13 @@ onmessage = function (event) {
       break;
     }
 
+    case 'deploy': {
+      (async ()=>{
+        await part.deploy();
+      })();
+      break;
+    }
+
     default:
       throw new Error(`part: invalid action ${action.type}`);
   }

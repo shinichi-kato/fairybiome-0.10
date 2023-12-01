@@ -64,7 +64,7 @@ class dbio {
   }
 
   async getPartNames(botId) {
-    let partList = await this.db.parts.where(['botId','name'])
+    let partList = await this.db.parts.where(['botId', 'name'])
       .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
       .toArray();
     return partList.map(p => p.name);
@@ -76,12 +76,12 @@ class dbio {
   }
 
   async saveScheme(botId, data) {
-    for(let node in data){
-      if(node === 'main'){
-        await this.db.scheme.put({botId: botId, payload:data[node]})
+    for (let node in data) {
+      if (node === 'main') {
+        await this.db.scheme.put({ botId: botId, payload: data[node] })
       }
       else {
-        await this.db.part.put({botId: botId, payload: data[node]})
+        await this.db.parts.put({ botId: botId, name: node, payload: data[node] })
       }
     }
   }
@@ -102,14 +102,14 @@ class dbio {
   }
 
   async clear(botId) {
-    await this.db.scheme.where({botId:botId}).delete();
-    await this.db.parts.where(['botId','name'])
+    await this.db.scheme.where({ botId: botId }).delete();
+    await this.db.parts.where(['botId', 'name'])
       .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
       .delete();
-    await this.db.flags.where(['botId','name'])
-    .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
-    .toArray().delete();
-    await this.db.memory.where({botId:botId}).delete();
+    await this.db.flags.where(['botId', 'name'])
+      .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
+      .toArray().delete();
+    await this.db.memory.where({ botId: botId }).delete();
   }
 
 
