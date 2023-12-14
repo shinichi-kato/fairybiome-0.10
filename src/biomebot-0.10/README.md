@@ -124,7 +124,6 @@ mainはメインスクリプトを読み込んで、パートのweb workerを起
 part: {
     encoder,            // エンコーダの方式名
     decoder,            // デコーダの方式名
-    avatar,             // このパートが発言する際に表示するアバター
     response: {
         minIntensity    // 返答の強度がminIntensity以上だった場合に返答を投入する
         retention       // このパートの発言が採用された場合、retentionの確率で
@@ -132,7 +131,10 @@ part: {
     },
     scrpt,              // スクリプト
 }
-パートは
+
+#### スクリプト
+スクリプトは文字列のリストで以下のような記法に従う。
+"with "
 
 パートに
 #### ログ型

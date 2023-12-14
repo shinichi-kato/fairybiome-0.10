@@ -25,7 +25,7 @@
 対応した語句が現れた場合、これを記憶した内容に置き換える。
 
 
-## 条件タグ (Condition Tag)
+## 条件タグ
 
 会話の中で一度挨拶をしたら、二度は必要ない。このような条件判断は適切な
 応答をするのに有力な方法になる。これをかんたんな記述で実現するため、
@@ -48,7 +48,7 @@
 与えるが出力文字列としては空文字に置き換わる。
 
 
-## 展開タグ (Expand Tag)
+## 展開タグ
 
 会話の中でランダムな文生成を利用したくなったとき、展開タグが便利である。
 展開タグは辞書中で
@@ -57,8 +57,6 @@
 
 のように記述され、outScript中に{animal}が見つかったらその部分は犬、猫、鶏
 のいずれかにランダムに置き換わる。
-展開タグのうち、タグ名に含まれるアルファベットがすべて大文字のものは
-システムが使用するタグで、これをSystem Tagと呼ぶ。
 
 
 ## タグの命名規則
@@ -89,160 +87,147 @@ NoderにICITagDictを与えることで、辞書にある単語だけをタグ�
 
 */
 
-import { systemTags, ICITags } from '../../../static/nlp/tags';
+import { namedTags, numberedTags } from '../../../static/nlp/tags';
 import { TinySegmenter } from '../tinysegmenter';
 
-const RE_TAG = /\{(\?|\?\!|\+|-|)[a-zA-Z_][a-zA-Z_0-9]*\}/g;
-const RE_ICI_TAG = /\{([0-9]+)\}/g;
+const RE_TAG = /$\{[a-zA-Z_]+\}$/;
 
 export class Node {
-  constructor(surface, feat) {
+  constructor(surface, feat, kind = '*') {
     this.surface = surface;
     this.feat = feat;
+    this.kind = kind;
   }
 }
 
 export class Noder {
   constructor() {
-    this.systemTagMap1 = getSystemTagMap1();
-    this.systemTagMap2 = new Map();
-    this.ICITagMap = getICITagMap();
+    this.memory = {};
+    this.loadMemory = this.loadMemory.bind(this);
+    this.run = this.run.bind(this);
+    this.getNamedTagSurfaces = this.getNamedTagSurfaces.bind(this);
+    this.getNumberedTagSufaces = this.getNumberedTagSufaces.bind(this);
+    this.getTagDict = this.getTagDict.bind(this);
+    this.getRESurfaces = this.getRESurfaces.bind(this);
+
     this.segmenter = new TinySegmenter();
+    this.namedTagSurfaces = this.getNamedTagSurfaces();
+    this.numberedTagSurfaces = this.getNumberedTagSufaces();
+    this.RESurfaces = this.getRESurfaces();
+    this.tagDict = this.getTagDict();
 
   }
 
-  load(memory) {
-    this.systemTagMap2 = getSystemTagMap2(memory);
-  }
 
   run(text) {
-    let tags = {};
+    let tags = [];
     let nodes = [];
-    let i = 0;
 
-    // 条件タグと展開タグ：透過
-    text = text.replace(RE_TAG, match => {
-      tags[i] = { surf: match, feat: match };
-      return `\v{i++}\v`;
-    })
-
-    // システムタグ：タグ化
-    for (const [key, value] of systemTagMap2) {
-      if(text.indexOf(key) !== -1){
-        tags[i] = {surf: key, feat: value }
-        text = text.replace(key, `\v{i++}\v`);
-      }
-    }
-    for (const [key, value] of systemTagMap1) {
-      if(text.indexOf(key) !== -1){
-        tags[i] = {surf: key, feat: `{${value}}` }
-        text = text.replace(key, `\v{i++}\v`);
-      }
-    }
-
-    // ICIタグ該当語句：タグ化
-    for (const [key, value] of ICITagMap) {
-      if (text.indexOF(key) !== -1) {
-        tags[i] = { surf: key, feat: `{${value}}` }
-        text = text.replace(key, `\v{i++}\v`);
-      }
-    }
+    text = text.replace(this.RESurfaces, match => {
+      tags.push(match);
+      return '\v'
+    });
 
     let segments = this.segmenter.segment(text);
-    let phase = 0;
-    for(let seg of segments){
-      if(phase === 0 && seg === '\v'){
-        phase = 1;
-        continue
-      } else 
-      if(phase === 1){
-        let t = tags[seg];
-        nodes.push(Node(t.surf,t.feat))
-        phase = 2;
-        continue;
-      } else 
-      if(phase === 2){ // seg === '\v'
-        phase=0;
-        continue;
+    let i = 0;
+    for (let s of segments) {
+      if (s === '\v') {
+        nodes.push(Node(tags[i], this.tagDict[tags[i]], "tag"))
+        i++;
       } else {
-        nodes.push(Node(seg,'*'))
+        nodes.push(Node(s, s, s.match(RE_TAG) ? "tag" : "*"))
       }
-
     }
+
     return nodes;
 
   }
-}
 
-function getICITagMap() {
-  // ICITagsの語句を長い順にソートしたMap
-
-  let dict = {};
-  let words = [];
-  for (let i = 0, l = ICITags.length; i < l; i++) {
-    for (let word of ICITags[i]) {
-      dict[word] = i;
-      words.push(word);
+  getNamedTagSurfaces() {
+    let surfs = [];
+    for (let tag in namedTags) {
+      surfs.push.apply(surfs, namedTags[tag]);
     }
-  }
-
-  let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
-  for (let word of words) {
-    tagMap.set(word, dict[word]);
-  }
-
-  return tagMap;
-}
-
-function getSystemTagMap1() {
-  let dict = {};
-  let words = [];
-  for (let tag in systemTags) {
-    for (let word of systemTags[tag]) {
-      dict[word] = tag;
-      words.push(word);
+    if ('{BOT_NAME}' in this.memory) {
+      surfs.push(this.memory['{BOT_NAME}'])
     }
-  }
-
-  let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
-  for (let word of words) {
-    tagMap.set(word, dict[word]);
-  }
-  return tagMap;
-
-}
-
-function getSystemTagMap2(memory) {
-  let dict = {};
-  let words = [];
-  if ('{BOT_NAME}' in memory) {
-    let word = memory['{BOT_NAME}']
-    dict[word] = '{BOT_NAME}';
-    words.push(word);
-  }
-
-  if ('{BOT_NICKNAMES}' in memory) {
-    for (let surf of memory['{BOT_NICKNAMES}']) {
-      dict[surf] = '{BOT_NICKNAME}';
-      words.push(surf);
+    if ('{BOT_NICK_NAMES}' in this.memory) {
+      surfs.push.apply(surfs, this.memory['{BOT_NICK_NAMES}']);
     }
-  }
-
-  if ('{USER_NICKNAMES}' in memory) {
-    for (let surf of memory['{USER_NICKNAMES']) {
-      dict[surf] = '{USER_NICKNAME}';
-      words.push(surf);
+    if ('{USER_NICK_NAMES}' in this.memory) {
+      surfs.push.apply(surfs, this.memory['{USER_NICK_NAMES}']);
     }
+
+    surfs = surfs.sort((a, b) => (b.length - a.length));
+    return surfs;
   }
 
-  let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
-  for (let word of words) {
-    tagMap.set(word, dict[word]);
+  getNumberedTagSufaces() {
+    let surfs = [];
+    for (let ts of numberedTags) {
+      surfs.push.apply(surfs, ts);
+    }
+    surfs = surfs.sort((a, b) => (b.length - a.length));
+    return surfs;
   }
-  return tagMap;
+
+  getTagDict() {
+    let dict = {};
+
+    for (let tag in namedTags) {
+      for (let surf of namedTags[tag]) {
+        dict[surf] = tag
+      }
+    }
+
+    for (let num in numberedTags) {
+      for (let surf of numberedTags[num]) {
+        let code = `${num}`
+          .replace(/0/g, 'A')
+          .replace(/1/g, 'B')
+          .replace(/2/g, 'C')
+          .replace(/3/g, 'D')
+          .replace(/4/g, 'E')
+          .replace(/5/g, 'F')
+          .replace(/6/g, 'G')
+          .replace(/7/g, 'H')
+          .replace(/8/g, 'I')
+          .replace(/9/g, 'J')
+        dict[surf] = `{tag${code}}`
+      }
+    }
+
+    if ('{BOT_NAME}' in this.memory) {
+      dict[this.memory['{BOT_NAME}']] = '{BOT_NAME}';
+    }
+    if ('{BOT_NICK_NAMES}' in this.memory) {
+      for (let surf of this.memory['{BOT_NICK_NAMES}']) {
+        dict[surf] = '{BOT_NICK_NAMES}'
+      }
+    }
+    if ('{USER_NICK_NAMES}' in this.memory) {
+      for (let surf of this.memory['{USER_NICK_NAMES}']) {
+        dict[surf] = '{USER_NICK_NAMES}'
+      }
+    }
+
+    return dict;
+
+  }
+
+  getRESurfaces() {
+    // 正規表現の制御文字エスケープは未実装
+    let surfs = this.namedTagSurfaces.concat(this.numberedTagSurfaces);
+
+    return new RegExp(surfs.join('|'), "g");
+  }
+
+  loadMemory(memory) {
+    this.memory = { ...memory }
+    this.namedTagSurfaces = this.getNamedTagSurfaces();
+    this.tagDict = this.getTagDict();
+    this.RESurfaces = this.getRESurfaces();
+  }
 }
 
 export const noder = new Noder();

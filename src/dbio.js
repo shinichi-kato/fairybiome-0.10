@@ -63,11 +63,16 @@ class dbio {
     return !!s & !!p
   }
 
-  async getPartNames(botId) {
+  async getPartNamesAndAvatarDir(botId) {
     let partList = await this.db.parts.where(['botId', 'name'])
       .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
       .toArray();
-    return partList.map(p => p.name);
+    let scheme = await this.db.scheme.where({botId: botId}).first();
+
+    return {
+      partNames: partList.map(p => p.name),
+      avatarDirs: scheme.avatarDir
+    }
   }
 
   async loadScheme(botId) {

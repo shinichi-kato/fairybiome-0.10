@@ -55,8 +55,7 @@ import { db } from '../dbio.js';
 
 import CentralWorker from './worker/central.worker';
 import PartWorker from './worker/part.worker';
-
-import {matrixize} from './worker/basic-encoder.js'
+import {noder} from './worker/noder.js';
 
 export const BiomebotContext = createContext();
 
@@ -112,6 +111,16 @@ function getAvatarNameDict(data){
     }
   });
   return d;
+}
+
+function getValidBotAvatars(data,avatarDir){
+  let avatars = [];
+  for(let node of data.allFile.nodes){
+    if(node.avatarDir === avatarDir){
+      avatars.push(node.name);
+    }
+  }
+  return avatars;
 }
 
 const initialState = {
@@ -254,6 +263,8 @@ export default function BiomebotProvider({ firestore, children }) {
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const flags = state.flags;
 
+  const test = noder.load();
+
 
   //-------------------------------------------
   // 制約充足：ユーザ発言の受付け
@@ -264,7 +275,7 @@ export default function BiomebotProvider({ firestore, children }) {
   function postUserMessage(message) {
     if (flags.deploy === 'done') {
       // workerが起動していればchannelにメッセージをポスト
-      centralWorkerRef.current.postMessage({ type: 'userPost', message: message });
+      centralWorkerRef.current.postMessage({ type: 'input', message: message });
     } else {
       // 起動前だったら起動。起動前に受け取ったメッセージは最後の
       // 一つだけ記憶しておく
@@ -285,7 +296,7 @@ export default function BiomebotProvider({ firestore, children }) {
     if (flags.deploy === 'done' && msgQueue.length !== 0) {
       for (let m of msgQueue) {
         // 一度にpostしてOKか？
-        centralWorkerRef.current.postMessage({ type: 'userPost', message: m });
+        centralWorkerRef.current.postMessage({ type: 'input', message: m });
       }
       setMsgQueue([]);
     }
@@ -295,7 +306,7 @@ export default function BiomebotProvider({ firestore, children }) {
   //-------------------------------------------
   // 制約充足：workerのdeploy
   //
-  // dexieDB上のschemeをworkerに読み込んで類似度計算を始める
+  // dexieDB上のschemeをworkerに読み込んで類似度行列の計算を始める
   //
 
   useEffect(() => {
@@ -303,15 +314,16 @@ export default function BiomebotProvider({ firestore, children }) {
       if (flags.upload_scheme === 'done') {
         const botId = auth.uid;
 
-        db.getPartNames(botId).then(partNames => {
+        db.getPartNamesAndAvatarDir(botId).then((partNames,avatarDir) => {
           // partのデプロイ
           console.log("deployParts")
           partWorkersRef.current = [];
 
           const numOfParts = partNames.length;
+          const validBotAvatars = getValidBotAvatars(chatbotsQuery,avatarDir);
 
           for (let pn of partNames) {
-            const pw = new PartWorker(matrixize);
+            const pw = new PartWorker();
             pw.onmessage = function (event) {
               const type = event.data.type;
               // partLoaded, partNotFound, partDeployedをディスパッチ
@@ -323,6 +335,7 @@ export default function BiomebotProvider({ firestore, children }) {
               type: 'deploy',
               botId: botId,
               partName: pn,
+              validAvatars: validBotAvatars
             })
             partWorkersRef.current.push(pw)
           }
