@@ -1,11 +1,13 @@
 import {
-  zeros, identity, divide, apply, concat, dot,
-  diag, multiply, norm, randomInt, max, clone,
+  zeros, identity, divide, apply, concat, add, subset, index,range,size,
+  diag, multiply, norm,
 } from "mathjs";
 import { noder } from './noder';
 
 const RE_TAG_LINE = /^(\{[a-zA-Z_]+\}) (.+)$/;
 const RE_BLANK_LINE = /^#?[ 　]*$/;
+const RE_EXPAND_TAG = /^\{[a-zA-Z_][a-zA-Z0-9_]*\}/;
+
 const KIND_USER = 1;
 const KIND_BOT = 2;
 const KIND_ENV = 4;
@@ -25,9 +27,9 @@ export function matrixize(inScript, params) {
     {?!tag}は-1という成分としてベクトル化し、正規化せずに
     返す。
   */
-  const { tailing } = params;
+  const tailing = params.tailing;
   let i = 0;
-  let nodes;
+  let feats;
   let wordVocab = {};
   let condVocab = {};
   let nodesBlocks = [];
@@ -37,13 +39,20 @@ export function matrixize(inScript, params) {
     for (let line of block) {
       line = line.slice(5); // "user "の除去
 
-      nodes = noder.run(line.map(n => n.feat));
-      b.push(nodes);
-      for (let node of nodes) {
-        if (node.startWith('{?') && node.endswith('}')) {
-          condVocab[node] = true;
-        } else {
-          wordVocab[node] = true;
+      feats = noder.run(line).map(n=>n.feat);
+      b.push(feats);
+      for (let feat of feats) {
+        if (feat.startsWith('{?') && feat.endsWith('}')) {
+          condVocab[feat] = true;
+        } else 
+        if(feat.startsWith('{!')){
+          return {
+            status: 'error',
+            message: [`${i}行に不正なタグ${feat}が見つかりました。{?!~}を使ってください`]
+          }
+        
+        }else {
+          wordVocab[feat] = true;
         }
       }
     }
@@ -57,9 +66,17 @@ export function matrixize(inScript, params) {
   const condVocabKeys = Object.keys(condVocab);
   const wordVocabKeys = Object.keys(wordVocab);
 
+  // condVocab,wordVocabともに1つしか要素がない場合
+  // dot()計算が失敗するのでダミーを加える
+  if(condVocabKeys.length === 1){
+    condVocabKeys.push('{?__dummy__}')
+  }
+  if(wordVocabKeys.length === 1){
+    wordVocabKeys.push('__dummy__');
+  }
+
   let ic = 0;
   let iw = 0;
-
   for (let k of condVocabKeys) {
     condVocab[k] = ic++;
   }
@@ -67,16 +84,14 @@ export function matrixize(inScript, params) {
     wordVocab[k] = iw++;
   }
 
+
   /*
-    Term Frequency: 各行内での単語の出現頻度
-    tf(t,d) = (ある単語tの行d内での出現回数)/(行d内の全ての単語の出現回数の和)
-    タグの重み付けとして、タグは一つ出現するごとに1ではなくtagWeight個の単語
-    とみなす。
+    Word Vector: 各行内での単語の出現回数
+    Cond Vector: 各行での各条件タグの「真」「偽」「非該当」状態
   */
 
-  let wv = zeros(wordVocabKeys.length); // 空の行列に縦積みできないのでzerosを仮置き
-  let cv = zeros(condVocabKeys.length); // 空の行列に縦積みできないのでzerosを仮置き
-
+  let wv = zeros(1,wordVocabKeys.length); // 空の行列に縦積みできないのでzerosを仮置き
+  let cv = zeros(1,condVocabKeys.length); // 空の行列に縦積みできないのでzerosを仮置き
   for (let block of nodesBlocks) {
     i = 0;
     let wvb = zeros(block.length, wordVocabKeys.length);
@@ -85,7 +100,7 @@ export function matrixize(inScript, params) {
       for (let word of nodes) {
         if (word in condVocab) {
           let pos = condVocab[word];
-          let w = word.startswith('{?!') ? -1 : 1;
+          let w = word.startsWith('{?!') ? -1 : 1;
           cvb.set([i, pos], cvb.get([i, pos]) + w);
         } else if (word in wordVocab) {
           let pos = wordVocab[word];
@@ -98,15 +113,18 @@ export function matrixize(inScript, params) {
       const de = delayEffector(block.length, tailing)
       wvb = multiply(de, wvb);
     }
-    wv = concat(wv, wvb, 1);
-    cv = concat(cv, cvb, 1);
+    wv = concat(wv, wvb, 0);
+    cv = concat(cv, cvb, 0);
   }
 
-  // 最上行の仮置きしたzerosを削除
-  wv = subset(wv, index(range(2, size(wv)[1]), range(1, size(wv)[2])))
-  cv = subset(cv, index(range(2, size(cv)[1]), range(1, size(cv)[2])))
+  // console.log(wv,cv)
 
-  // fv: Feature Vector
+  // 最上行の仮置きしたzerosを削除
+  const wvSize = size(wv).toArray()
+  const cvSize = size(cv).toArray()
+  wv = subset(wv, index(range(1, wvSize[0]), range(0, wvSize[1])))
+  cv = subset(cv, index(range(1, cvSize[0]), range(0, cvSize[1])))
+
   // 成分は非負で類似度計算の際、通常の単語はnorm=1に正規化した上で
   // 内積を計算して類似度とする。条件タグは
   // fv = concat([cond], [wv / norm(wv)])
@@ -117,21 +135,18 @@ export function matrixize(inScript, params) {
   // 類似度計算の際は正規化せずに内積を取り、それをtagWeight倍して
   // fvの内積に加える
 
-  const inv_wv = apply(wv, 1, x => divide(1, norm(x)));
+  const inv_wv = apply(wv, 1, x => divide(1, norm(x) || 1 ));
   wv = multiply(diag(inv_wv), wv);
-
 
   return {
     status: "ok",
-    wordVocabLength: wordVocabLength,
-    condVocabLength: condVocabLength,
+    wordVocabLength: wordVocabKeys.length,
+    condVocabLength: condVocabKeys.length,
     wordVocab: wordVocab,
     condVocab: condVocab,
     wordMatrix: wv,
     condMatrix: cv,
   }
-
-
 }
 
 export function tee(script) {
@@ -143,22 +158,33 @@ export function tee(script) {
   let outScript = [];
   let inBlock = [];
   let outBlock = [];
+  let errors = [];
 
+  let i=0;
   for (let block of script) {
     for (let line of block) {
-      if (line.startswith('uesr ')) {
+      if (line.startsWith('user ')) {
         inBlock.push(line)
       } else {
         outBlock.push(line)
       }
+      i++;
     }
     inScript.push([...inBlock]);
     outScript.push([...outBlock]);
     inBlock = [];
     outBlock = [];
+    if(inBlock.length !== outBlock.length){
+      errors.push(`${i}行目: 入力と出力の数が異なっています`)
+    }
   }
 
-  return [inScript, outScript];
+  return {
+    inScript:inScript,
+    outScript: outScript,
+    status: errors.length === 0 ? "ok" : "error",
+    errors: errors
+  };
 }
 
 export function preprocess(script, validAvatars) {
@@ -182,7 +208,7 @@ export function preprocess(script, validAvatars) {
   let isInputExists = false;
   let isOutputExists = false;
   let prevKind = null;
-  let re_va = RegExp("$(" + validAvatars.join("|") + "|bot) ");
+  let re_va = RegExp("^(" + validAvatars.join("|") + "|bot) (.*)$");
   let warnings = [];
   let errors = [];
   let i, l;
@@ -202,18 +228,18 @@ export function preprocess(script, validAvatars) {
   for (i = 0, l = script.length; i < l; i++) {
     let line = script[i];
     // コメント除去
-    if (line.startswith('#')) continue;
+    if (line.startsWith('#')) continue;
 
     // タグ
     const found = line.match(RE_TAG_LINE);
     if (found) {
-      tagDict[found[0]] = found[1].split('\t');
+      tagDict[found[1]] = found[2].split('\t');
       continue;
     }
 
     // with文
     // uesr,botより先に記述しなければならない。警告を返し無視される
-    if (line.startswith('with ')) {
+    if (line.startsWith('with ')) {
       if (!isNonWithExists) {
         withLine = withLine + line.slice(5);
       } else {
@@ -225,30 +251,30 @@ export function preprocess(script, validAvatars) {
     // avatar文
     // デフォルトアバターを指定。botで始まる行に適用される
 
-    if (line.startswith('avatar ')) {
-      let a = line.slice(6);
+    if (line.startsWith('avatar ')) {
+      let a = line.slice(7);
       if (validAvatars.includes(a)) {
         avatar = a;
       } else {
-        warnings.push(`warning: ${i}行で指定されたavatar ${a} は有効ではありません`)
+        warnings.push(`warning: ${i}行: avatar '${a}' は有効ではありません。無視されます。`)
       }
       isNonWithExists = true;
       continue;
     }
 
     // tagWeight文
-    if (line.startswith('tagWeight ')) {
-      let a = line.slice(9);
+    if (line.startsWith('tagWeight ')) {
+      let a = line.slice(10);
       if (!isNaN(a)) {
         tagWeight = parseFloat(a);
       } else {
-        warnings.push(`warnings: ${i}行で指定されたtagWeightは有効ではありません`)
+        warnings.push(`warnings: ${i}行: tagWeight ${a} は有効ではありません`)
       }
       continue;
     }
 
     // tailing文
-    if (line.startswith('tailing ')) {
+    if (line.startsWith('tailing ')) {
       let a = line.slice(8);
       if (!isNaN(a)) {
         tailing = parseFloat(a);
@@ -259,7 +285,7 @@ export function preprocess(script, validAvatars) {
     }
 
     // env行
-    if (line.startswith("env ")) {
+    if (line.startsWith("env ")) {
       const c = line.slice(4);
 
       if (prevKind === KIND_USER) {
@@ -274,7 +300,7 @@ export function preprocess(script, validAvatars) {
         block[l] = `${block[l]}${c}`;
       } else {
         // env行はuser行に読み替える
-        block.push(`user ${c}`)
+        block.push(`user ${c}${withLine}`)
       }
       prevKind = KIND_ENV;
       isNonWithExists = true;
@@ -283,7 +309,7 @@ export function preprocess(script, validAvatars) {
     }
 
     // user行
-    if (line.startswith('user ')) {
+    if (line.startsWith('user ')) {
       if (prevKind === KIND_USER) {
         // 連続したuser行にpromptを挟む
         block.push("peace {prompt}")
@@ -305,15 +331,16 @@ export function preprocess(script, validAvatars) {
       continue;
     }
 
-    // 連続したbot行を一行にまとめる
+    // bot行
+    // 連続したbot行は一行にまとめる
     let match = line.match(re_va);
     if (match) {
       if (match[1] === 'bot') {
-        line = `${avatar} ${line.slice(4)}`;
+        line = `${avatar} ${match[2]}`;
       }
       if (prevKind === KIND_BOT) {
         const l = block.length - 1;
-        block[l] = `${block[l]}\f{line}`;
+        block[l] = `${block[l]}\f${line}`;
       } else {
         block.push(line)
       }
@@ -329,6 +356,7 @@ export function preprocess(script, validAvatars) {
     // 連続した空行は一つとみなす
     if (line.match(RE_BLANK_LINE)) {
       appendBlock();
+      prevKind=null;
       continue;
     }
 
@@ -341,7 +369,7 @@ export function preprocess(script, validAvatars) {
   if (errors.length !== 0) {
     return {
       status: 'error',
-      messages: errors
+      messages: [...errors,...warnings]
     };
   }
   if (warnings.length !== 0) {
@@ -379,12 +407,11 @@ export function delayEffector(size, level) {
    任意の行列 M に対して de×M をすることで上の行の情報が
    下の行に影響を及ぼす、やまびこのような効果を与える
   */
-  let m = level * identity(size - 1);
-  let pr = zeros(1, size - 1);
-  let pt = zeros(size);
-  m = concat(m, pr)
-  m = concat(pt, m, 0)
-  return m;
+  let m = identity(size);
+  let d = multiply(identity(size - 1), level);
+  d = concat(zeros(1, size - 1), d,0);
+  d = concat(d, zeros(size, 1));
+  return add(m, d);
 }
 
 export function expand(tag, dict) {
@@ -396,7 +423,7 @@ export function expand(tag, dict) {
 
   let item = items[Math.floor(Math.random() * items.length)];
 
-  item = item.replace(RE_TAG, (whole, itemTag) => expand(itemTag, dict));
+  item = item.replace(RE_EXPAND_TAG, match => expand(match, dict));
 
   return item;
 }

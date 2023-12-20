@@ -265,6 +265,11 @@ export default function BiomebotProvider({ firestore, children }) {
 
   const test = noder.load();
 
+  //---------------------------------
+  // unittest
+  //
+
+  
 
   //-------------------------------------------
   // 制約充足：ユーザ発言の受付け

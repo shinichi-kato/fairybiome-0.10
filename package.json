@@ -26,9 +26,13 @@
     "develop": "gatsby develop",
     "build": "gatsby build",
     "serve": "gatsby serve",
-    "post-update": "echo \"codesandbox preview only, need an update\" && yarn upgrade --latest"
+    "post-update": "echo \"codesandbox preview only, need an update\" && yarn upgrade --latest",
+    "test": "vitest"
   },
   "devDependencies": {
+    "@vitest/web-worker": "^1.0.4",
+    "fake-indexeddb": "^5.0.1",
+    "vitest": "^1.0.4",
     "worker-loader": "^3.0.8"
   }
 }

@@ -123,28 +123,28 @@ export class Noder {
     // 条件タグと展開タグ：透過
     text = text.replace(RE_TAG, match => {
       tags[i] = { surf: match, feat: match };
-      return `\v{i++}\v`;
+      return `\v${i++}\v`;
     })
 
     // システムタグ：タグ化
-    for (const [key, value] of systemTagMap2) {
+    for (const [key, value] of this.systemTagMap2) {
       if(text.indexOf(key) !== -1){
         tags[i] = {surf: key, feat: value }
-        text = text.replace(key, `\v{i++}\v`);
+        text = text.replace(key, `\v${i++}\v`);
       }
     }
-    for (const [key, value] of systemTagMap1) {
+    for (const [key, value] of this.systemTagMap1) {
       if(text.indexOf(key) !== -1){
-        tags[i] = {surf: key, feat: `{${value}}` }
-        text = text.replace(key, `\v{i++}\v`);
+        tags[i] = {surf: key, feat: value }
+        text = text.replace(key, `\v${i++}\v`);
       }
     }
 
     // ICIタグ該当語句：タグ化
-    for (const [key, value] of ICITagMap) {
-      if (text.indexOF(key) !== -1) {
+    for (const [key, value] of this.ICITagMap) {
+      if (text.indexOf(key) !== -1) {
         tags[i] = { surf: key, feat: `{${value}}` }
-        text = text.replace(key, `\v{i++}\v`);
+        text = text.replace(key, `\v${i++}\v`);
       }
     }
 
@@ -156,8 +156,9 @@ export class Noder {
         continue
       } else 
       if(phase === 1){
+        console.error(seg)
         let t = tags[seg];
-        nodes.push(Node(t.surf,t.feat))
+        nodes.push(new Node(t.surf,t.feat))
         phase = 2;
         continue;
       } else 
@@ -165,7 +166,7 @@ export class Noder {
         phase=0;
         continue;
       } else {
-        nodes.push(Node(seg,'*'))
+        nodes.push(new Node(seg,seg))
       }
 
     }
@@ -187,7 +188,7 @@ function getICITagMap() {
   }
 
   let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
+  words.sort((a, b) => (b.length - a.length));
   for (let word of words) {
     tagMap.set(word, dict[word]);
   }
@@ -206,7 +207,7 @@ function getSystemTagMap1() {
   }
 
   let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
+  words.sort((a, b) => (b.length - a.length));
   for (let word of words) {
     tagMap.set(word, dict[word]);
   }
@@ -238,7 +239,7 @@ function getSystemTagMap2(memory) {
   }
 
   let tagMap = new Map();
-  words.sort(a, b => (b.length - a.length));
+  words.sort((a, b) => (b.length - a.length));
   for (let word of words) {
     tagMap.set(word, dict[word]);
   }

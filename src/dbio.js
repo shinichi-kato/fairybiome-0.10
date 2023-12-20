@@ -44,7 +44,7 @@ class dbio {
 
     this.exists = this.exists.bind(this);
     this.saveScheme = this.saveScheme.bind(this);
-    this.getPartNames = this.getPartNames.bind(this);
+    this.getPartNamesAndAvatarDir = this.getPartNamesAndAvatarDir.bind(this);
     this.loadScheme = this.loadScheme.bind(this);
     this.loadPart = this.loadPart.bind(this);
     this.savePart = this.savePart.bind(this);
@@ -89,6 +89,7 @@ class dbio {
         await this.db.parts.put({ botId: botId, name: node, payload: data[node] })
       }
     }
+    return true;
   }
 
   async loadPart(botId, partName) {
@@ -98,12 +99,14 @@ class dbio {
     }).first();
     return data;
   }
+
   async savePart(botId, partName, data) {
     await this.db.parts.put({
       botId: botId,
-      partName: partName,
-      ...data
+      name: partName,
+      payload: data
     });
+    return true;
   }
 
   async clear(botId) {
