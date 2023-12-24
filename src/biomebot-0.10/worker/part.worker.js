@@ -5,7 +5,7 @@ part worker
 */
 import { part } from './part.core'
 
-self.onmessage = function (event) {
+onmessage = function (event) {
   console.log("part onmessage", event)
   const action = event.data;
   const botId = action.botId;
@@ -14,11 +14,11 @@ self.onmessage = function (event) {
       (async () => {
         let result = await part.load(botId, action.partName);
         if (result) {
-          self.postMessage({ type: 'partLoaded', result: result });
+          postMessage({ type: 'partLoaded', result: result });
           result = part.deploy();
-          self.postMessage({ type: 'partDeployed', result: result });
+          postMessage({ type: 'partDeployed', result: result });
         } else {
-          self.postMessage({ type: 'partNotFound' });
+          postMessage({ type: 'partNotFound' });
         }
       })();
       break;

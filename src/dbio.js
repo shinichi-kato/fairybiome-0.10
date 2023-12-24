@@ -68,27 +68,35 @@ class dbio {
       .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
       .toArray();
     let scheme = await this.db.scheme.where({botId: botId}).first();
+    console.log(partList)
 
     return {
       partNames: partList.map(p => p.name),
-      avatarDirs: scheme.avatarDir
+      validAvatars: scheme.validAvatars
     }
   }
 
   async loadScheme(botId) {
     const data = await this.db.scheme.where({ botId: botId }).first();
-    return data;
+    return [data.payload,data.validAvatars];
   }
 
-  async saveScheme(botId, data) {
-    for (let node in data) {
-      if (node === 'main') {
-        await this.db.scheme.put({ botId: botId, payload: data[node] })
+  async saveScheme(botId, data, avatarDict) {
+    if('payload' in data ){
+      const payload = data.payload;
+      for (let node in payload) {
+        if (node === 'main') {
+          await this.db.scheme.put({ 
+            botId: botId, payload: payload[node], 
+            validAvatars:avatarDict[payload.main.avatarDir] })
+        }
+        else {
+          await this.db.parts.put({ botId: botId, name: node, payload: payload[node] })
+        }
       }
-      else {
-        await this.db.parts.put({ botId: botId, name: node, payload: data[node] })
-      }
+      return true;
     }
+    await this.db.scheme.put({botId: botId, payload: data.payload})
     return true;
   }
 
@@ -97,7 +105,8 @@ class dbio {
       botId: botId,
       name: partName
     }).first();
-    return data;
+    console.log(data)
+    return data.payload;
   }
 
   async savePart(botId, partName, data) {

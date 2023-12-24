@@ -9,7 +9,7 @@ describe("matrix", () => {
     'avatar peace',
     '{fruit} りんご\tブドウ',
     'user 好きなものは？',
-    'tagWeight 2.2',
+    'condWeight 2.2',
     'bot {fruit}!',
     '',
     'env {?onStart}',

@@ -92,8 +92,7 @@ NoderにICITagDictを与えることで、辞書にある単語だけをタグ�
 import { systemTags, ICITags } from '../../../static/nlp/tags';
 import { TinySegmenter } from '../tinysegmenter';
 
-const RE_TAG = /\{(\?|\?\!|\+|-|)[a-zA-Z_][a-zA-Z_0-9]*\}/g;
-const RE_ICI_TAG = /\{([0-9]+)\}/g;
+const RE_TAG = /\{(\?|\?!|\+|-|)[a-zA-Z_][a-zA-Z_0-9]*\}/g;
 
 export class Node {
   constructor(surface, feat) {

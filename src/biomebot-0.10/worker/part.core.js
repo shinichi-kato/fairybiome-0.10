@@ -15,11 +15,9 @@ import { matrixize, tee, preprocess, delayEffector, expand } from './matrix.js';
 
 const RE_OUTSCRIPT = /^([^ ]+) (.+)$/;
 const RE_EXPAND_TAG = /^\{([a-zA-Z_][a-zA-Z0-9_]*)\}/;
-// const RE_OUTPUT_TAG = /\{([+-])?([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
 const RE_ICI_TAG = /^\{[0-9]+\}$/;
-// const RE_INPUT_COND_TAG = /\{\?(!)?([a-zA-Z_]+)\}/g;
-const RE_COND_TAG = /\{([+-])([a-zA-Z_][a-zA-Z0-9_]*)\}/;
-// const RE_TAG = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
+const RE_OUT_COND_TAG = /\{([+-])([a-zA-Z_][a-zA-Z0-9_]*)\}/;
+const RE_IN_COND_TAG = /^\{(\?!?)([a-zA-Z_][a-zA-Z0-9_]*)\}$/;
 
 const RE_TAG_LINE = /^(\{[a-zA-Z_]+\}) (.+)$/;
 const RE_BLANK_LINE = /^#?[ 　]*$/;
@@ -44,6 +42,7 @@ export const part = {
   vocab: null,
   validAvatars: [],
   condVector: null,
+  pendingCond: {},
   outScript: [],
 
   handleInput: (action) => {
@@ -65,7 +64,7 @@ export const part = {
     if (action.partName === part.partName) {
       part.activate();
     } else {
-      part.deactivate();
+      part.inertial();
     }
   },
 
@@ -75,9 +74,7 @@ export const part = {
       return false;
     }
     part.partName = partName;
-    const payload = data.payload;
-    part.response = { ...payload.response };
-    part.script = [...payload.script];
+    part.script = [...data.script];
     part.validAvatars = [...validAvatars];
     return true;
   },
@@ -114,19 +111,23 @@ export const part = {
 
     const params = pp.params;
 
-    part.tagWeight = params.tagWeight;
+    part.condWeight = params.condWeight;
     part.tagDict = params.tagDict;
+    part.response = {
+      minIntensity: params.minIntensity,
+      retention: params.retention,
+    },
     part.wordVocabLength = mt.wordVocabLength;
     part.condVocabLength = mt.condVocabLength;
     part.wordVocab = mt.wordVocab;
     part.condVocab = mt.condVocab;
     part.wordMatrix = mt.wordMatrix;
     part.condMatrix = mt.condMatrix;
-    part.inDelayEffect = delayEffector(2, params.tagWeight);
+    part.inDelayEffect = delayEffector(2, params.condWeight);
     part.outScript = outScript;
     part.prevWv = zeros(1, mt.wordVocabLength); // 直前の入力
     part.prevCv = zeros(1, mt.condVocabLength); // 直前の入力
-    part.condVector = ones(1, mt.condVocabLength) * -1; //初期の条件ベクトル(すべて-1)
+    part.condVector = multiply(ones(1, mt.condVocabLength), -1); //初期の条件ベクトル(すべて-1)
     part.pendingCond = {};
     part.ICITags = {};
     return {
@@ -138,7 +139,7 @@ export const part = {
     /* 
       入力文字列を受取り、スコアを返す
       wordVectorは正規化してwordMatrixとの内積。
-      condVectorはそのままcondMatrixとの内積を計算してtagWeight倍する。
+      condVectorはそのままcondMatrixとの内積を計算してcondWeight倍する。
       両者を加えたものをscoreとする
     */
     let wv = zeros(1, part.wordVocabLength);
@@ -151,14 +152,17 @@ export const part = {
       if (feat in part.wordVocab) {
         let pos = part.wordVocab[feat];
         wv.set([0, pos], wv.get([0, pos]) + 1);
-      } else if (feat in part.condVocab) {
-        let pos = part.condVocab[feat];
-        cv.set([0, pos], node.startswith('{?!') ? -part.tagWieght : part.tagWeight);
+      } else {
+        const m = feat.match(RE_IN_COND_TAG);
+        if(m){
+          let pos = part.condVocab[m[2]];
+          cv.set([0,pos], m[1] === '?' ? part.condWeight: -part.condWeight);
+        }
       }
       /*
         ICIタグが入力文字列中にあればその時のsurfaceとfeatを記憶
       */
-      const m = feat.match(RE_ICI_TAG);
+      let m = feat.match(RE_ICI_TAG);
       if (m) {
         part.ICITags[feat] = node.surface;
 
@@ -234,9 +238,9 @@ export const part = {
 
       // 条件タグの保持
       // {+tag} {-tag}は記憶しておき、戻り値は空文字
-      let match = feat.match(RE_COND_TAG);
-      if (match) {
-        part.pendingCond[`{?${match[2]}}`] = match[1] === '+' ? 1 : -1;
+      let m = feat.match(RE_OUT_COND_TAG);
+      if (m) {
+        part.pendingCond[m[2]] = m[1] === '+' ? 1 : -1;
         newNodes[i].surface = "";
       }
     }
@@ -263,7 +267,7 @@ export const part = {
       if (!(tagFeat in part.tagDict)) return [tag];
 
       const items = part.tagDict[tagFeat];
-      let item = items[Math.floor(Math.random() * items.length)];
+      let item = items[randomInt(items.length)];
 
       let nodes = noder.run(item);
       let newNodes = [];
@@ -287,14 +291,29 @@ export const part = {
 
   activate: () => {
     // 直前のrenderが採用された
-    // retentionチェックが成功したら{?activate}を+に
+    // retentionチェックが成功したら{?activated}を+に
     // CondVectorを更新
+    let pos = part.condVocab['activated'];
+    console.log(part.condVector)
+    part.condVector.set([0,pos],part.condWeight);
+
+    for(let key in part.pendingCond){
+      pos = part.condVocab[key];
+      part.condVector.set([0,pos],part.condWeight*part.pendingCond[key]);
+    }
     
+    part.pendingCond = {};
+    return true;
   },
 
-  deactivate: () => {
+  inertial: () => {
     // 直前のrenderが不採用だった
     // ・condPendingの削除
+    if(part.retention > random()){
+      let pos = part.condVocab['activated'];
+      part.condVector.set([0,pos],-part.condWeight);
+    }
+    part.pendingCond = {};
   }
 };
 

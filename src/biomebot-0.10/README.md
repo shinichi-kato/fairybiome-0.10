@@ -121,20 +121,29 @@ mainはメインスクリプトを読み込んで、パートのweb workerを起
 最も強いものが複数あった場合は両方発言する。
 
 ### part
-part: {
-    encoder,            // エンコーダの方式名
-    decoder,            // デコーダの方式名
-    response: {
-        minIntensity    // 返答の強度がminIntensity以上だった場合に返答を投入する
-        retention       // このパートの発言が採用された場合、retentionの確率で
-                        // 次回のminIntensityが無視される
-    },
-    scrpt,              // スクリプト
-}
-
 #### スクリプト
-スクリプトは文字列のリストで以下のような記法に従う。
-"with "
+スクリプトは文字列のリストで以下のような記法に従う
+```
+# パラメータセクション
+avatar peace デフォルトのavatarを指定, optional
+condWeight 2.0 条件タグの重み付け, optional
+minIntensity 0.2 パートが発言するscoreの最小値, optional
+retention 0.5 一度activateされたパートが次回もactivateである確率, optional
+tailing 0.3 類似度計算で一つの話題の中で前の行の情報が残存する強度, optional
+
+# タグセクション
+{tag} タグ文字 展開タグの定義, optional
+with {?tag} すべてのbot,user,env行に追加される条件タグ, optional
+
+# コーパスセクション
+env 環境からの入力メッセージ
+user ユーザ発言
+bot ボットの返答
+peace ボットの返答(先頭をavatar名にすると、そのavatarが表示される)
+```
+
+スクリプトはパラメータ、タグ、コーパスというセクションに別れ、コーパスセクションでは
+空行は話題の区切りとして機能する。
 
 パートに
 #### ログ型

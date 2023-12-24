@@ -51,11 +51,11 @@ import { AuthContext } from '../components/Auth/AuthProvider';
 
 import { isExistUserChatbot, uploadScheme, downloadScheme } from '../fsio.js';
 import { db } from '../dbio.js';
+import {randomInt} from 'mathjs';
 // import { Message } from '../message.js';
 
 import CentralWorker from './worker/central.worker';
 import PartWorker from './worker/part.worker';
-import {noder} from './worker/noder.js';
 
 export const BiomebotContext = createContext();
 
@@ -88,35 +88,39 @@ query {
 
 function getBotName2RelativeDir(data) {
   // 上記のgraphql queryから{_BOT_NAME_ :relativeDirectory}という辞書を作る
+  // ただし'loading'という名前のチャットボットは除外
 
   let d = {};
   data.allJson.nodes.forEach(n => {
     let dir = n.parent.relativeDirectory;
-    if (n.memory && ('_BOT_NAME_' in n.memory)) {
-      d[n.memory._BOT_NAME_] = dir;
+    if (dir !== 'loading'){
+      if (n.memory && ('_BOT_NAME_' in n.memory)) {
+        d[n.memory._BOT_NAME_] = dir;
+      }
     }
   })
 
   return d;
 }
 
-function getAvatarNameDict(data){
+function getAvatarNameDict(data) {
   let d = {};
-  data.allFile.nodes.forEach(n=>{
-    const dir=n.relativeDirectory;
-    if(dir in d){
+  console.log(data);
+  data.allFile.nodes.forEach(n => {
+    const dir = n.relativeDirectory;
+    if (dir in d) {
       d[dir].push(n.name);
-    }else{
-      d[dir]=[n.name];
+    } else {
+      d[dir] = [n.name];
     }
   });
   return d;
 }
 
-function getValidBotAvatars(data,avatarDir){
+function getValidBotAvatars(data, avatarDir) {
   let avatars = [];
-  for(let node of data.allFile.nodes){
-    if(node.avatarDir === avatarDir){
+  for (let node of data.allFile.nodes) {
+    if (node.avatarDir === avatarDir) {
       avatars.push(node.name);
     }
   }
@@ -263,13 +267,6 @@ export default function BiomebotProvider({ firestore, children }) {
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const flags = state.flags;
 
-  const test = noder.load();
-
-  //---------------------------------
-  // unittest
-  //
-
-  
 
   //-------------------------------------------
   // 制約充足：ユーザ発言の受付け
@@ -319,13 +316,13 @@ export default function BiomebotProvider({ firestore, children }) {
       if (flags.upload_scheme === 'done') {
         const botId = auth.uid;
 
-        db.getPartNamesAndAvatarDir(botId).then((partNames,avatarDir) => {
+        db.getPartNamesAndAvatarDir(botId).then(({partNames, avatarDir}) => {
           // partのデプロイ
-          console.log("deployParts")
+          console.log("deployParts",partNames,avatarDir)
           partWorkersRef.current = [];
 
           const numOfParts = partNames.length;
-          const validBotAvatars = getValidBotAvatars(chatbotsQuery,avatarDir);
+          const validBotAvatars = getValidBotAvatars(chatbotsSnap, avatarDir);
 
           for (let pn of partNames) {
             const pw = new PartWorker();
@@ -386,7 +383,7 @@ export default function BiomebotProvider({ firestore, children }) {
       partWorkersRef.current.map(p => p.terminate());
     }
   },
-    [flags.deploy, flags.upload_scheme, auth.uid]);
+    [flags.deploy, flags.upload_scheme, auth.uid, chatbotsSnap]);
 
   //-------------------------------------------------------------
   // 制約充足：schemeの選択とアップロード
@@ -401,24 +398,25 @@ export default function BiomebotProvider({ firestore, children }) {
       console.log("upload_scheme");
       let data = {};
       const botId = auth.uid;
+      const avatarDict = getAvatarNameDict(chatbotsSnap);
+      let dir;
       (async () => {
         if (!await isExistUserChatbot(firestore, auth.uid)) {
           // ユーザインプットにチャットボットの名前が含まれていたらそれを採用。
           // なければランダムに選ぶ
           const botname2dir = getBotName2RelativeDir(chatbotsSnap);
-          let dir;
-          if(msgQueue.length !== 0){
+          if (msgQueue.length !== 0) {
             for (let botname in botname2dir) {
               if (msgQueue[0].contains(botname)) {
                 dir = botname2dir[botname];
                 break
               }
             }
-  
+
           }
           if (!dir) {
             const names = Object.keys(botname2dir)
-            const index = Math.floor(Math.random() * names.length)
+            const index = randomInt(names.length);
             dir = botname2dir[names[index]];
           }
 
@@ -431,8 +429,8 @@ export default function BiomebotProvider({ firestore, children }) {
           }
 
           // firestoreに上書き
-          const avatarDict=getAvatarNameDict();
-          await uploadScheme(firestore, botId, data,avatarDict);
+          
+          await uploadScheme(firestore, botId, data, avatarDict);
 
         }
         else {
@@ -442,7 +440,7 @@ export default function BiomebotProvider({ firestore, children }) {
         }
 
         // dexieに書き込む
-        await db.saveScheme(botId, data);
+        await db.saveScheme(botId, data, avatarDict);
 
         dispatch({ type: 'flag', flags: { upload_scheme: 'done' } });
       })();
@@ -452,7 +450,7 @@ export default function BiomebotProvider({ firestore, children }) {
 
     }
 
-  }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, msgQueue.length,msgQueue]);
+  }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, msgQueue.length, msgQueue]);
 
 
 

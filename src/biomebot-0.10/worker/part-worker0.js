@@ -126,7 +126,7 @@ export class Part {
       return mt;
     }
 
-    this.tagWeight = pp.tagWeight;
+    this.condWeight = pp.condWeight;
     this.tagDict = pp.tagDict;
     this.wordVocabLength = mt.wordVocabLength;
     this.condVocabLength = mt.condVocabLength;
@@ -134,7 +134,7 @@ export class Part {
     this.condVocab = mt.condVocab;
     this.wordMatrix = mt.wordMatrix;
     this.condMatrix = mt.condMatrix;
-    this.inDelayEffect = delayEffector(2, pp.tagWeight);
+    this.inDelayEffect = delayEffector(2, pp.condWeight);
     this.outScript = outScript;
     this.prevWv = zeros(1, this.wordVocabLength); // 直前の入力
     this.prevCv = zeros(1, this.condVocabLength); // 直前の入力
@@ -150,7 +150,7 @@ export class Part {
     /* 
       入力文字列を受取り、スコアを返す
       wordVectorは正規化してwordMatrixとの内積。
-      condVectorはそのままcondMatrixとの内積を計算してtagWeight倍する。
+      condVectorはそのままcondMatrixとの内積を計算してcondWeight倍する。
       両者を加えたものをscoreとする
     */
     let wv = zeros(1, this.wordVocabLength);
@@ -190,7 +190,7 @@ export class Part {
 
     // 類似度計算
     const wvdot = apply(this.wordMatrix, 1, x => dot(x, wvd));
-    const cvdot = apply(this.condMatrix, 1, x => dot(x, cv)) * this.tagWeight;
+    const cvdot = apply(this.condMatrix, 1, x => dot(x, cv)) * this.condWeight;
     const scores = add(wvdot, cvdot).valueOf();
     const maxScore = Math.max(...scores);
     const cands = [];

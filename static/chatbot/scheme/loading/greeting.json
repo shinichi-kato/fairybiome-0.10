@@ -1,12 +1,8 @@
 {
-    "encoder": "BasicEncoder",
-    "decoder": "BasicDecoder",
-    "avatar": "cheer",
-    "response": {
-        "minIntensity": 0.3,
-        "retention": 0.5
-    },
     "script": [
+        "minIntensity 0.3",
+        "retention 0.5",
+        "avatar cheer",
         "with {!greeting}",
         "user こんにちは",
         "cheer 今日は！{+greeting}",

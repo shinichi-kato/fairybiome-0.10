@@ -7,12 +7,15 @@ import { noder } from './noder';
 const RE_TAG_LINE = /^(\{[a-zA-Z_]+\}) (.+)$/;
 const RE_BLANK_LINE = /^#?[ 　]*$/;
 const RE_EXPAND_TAG = /^\{[a-zA-Z_][a-zA-Z0-9_]*\}/;
+const RE_COND_TAG = /^\{(\?!?)([a-zA-Z_][a-zA-Z0-9_]*)\}$/;
 
 const KIND_USER = 1;
 const KIND_BOT = 2;
 const KIND_ENV = 4;
 const DEFAULT_TAG_WEIGHT = 2.0;
 const DEFAULT_TAILING = 0.2;
+const DEFAULT_MIN_INTENSITY = 0.1;
+const DEFAULT_RETENTION = 0.4;
 
 export function matrixize(inScript, params) {
   /* inスクリプトから類似度計算用の行列を生成する。
@@ -28,6 +31,7 @@ export function matrixize(inScript, params) {
     返す。
   */
   const tailing = params.tailing;
+  const condWeight = params.condWeight;
   let i = 0;
   let feats;
   let wordVocab = {};
@@ -42,8 +46,9 @@ export function matrixize(inScript, params) {
       feats = noder.run(line).map(n=>n.feat);
       b.push(feats);
       for (let feat of feats) {
-        if (feat.startsWith('{?') && feat.endsWith('}')) {
-          condVocab[feat] = true;
+        const m = feat.match(RE_COND_TAG);
+        if(m){
+            condVocab[m[2]] = true;
         } else 
         if(feat.startsWith('{!')){
           return {
@@ -66,10 +71,13 @@ export function matrixize(inScript, params) {
   const condVocabKeys = Object.keys(condVocab);
   const wordVocabKeys = Object.keys(wordVocab);
 
+  // 必須のcondVocabを追加
+  condVocabKeys.push('activated');
+
   // condVocab,wordVocabともに1つしか要素がない場合
   // dot()計算が失敗するのでダミーを加える
   if(condVocabKeys.length === 1){
-    condVocabKeys.push('{?__dummy__}')
+    condVocabKeys.push('__dummy__')
   }
   if(wordVocabKeys.length === 1){
     wordVocabKeys.push('__dummy__');
@@ -98,11 +106,12 @@ export function matrixize(inScript, params) {
     let cvb = zeros(block.length, condVocabKeys.length);
     for (let nodes of block) {
       for (let word of nodes) {
-        if (word in condVocab) {
-          let pos = condVocab[word];
-          let w = word.startsWith('{?!') ? -1 : 1;
-          cvb.set([i, pos], cvb.get([i, pos]) + w);
-        } else if (word in wordVocab) {
+        const m = word.match(RE_COND_TAG);
+        if(m){
+          let pos = condVocab[m[2]];
+          cvb.set([i,pos], m[1] === '?' ? condWeight : -condWeight);
+        }
+        else if (word in wordVocab) {
           let pos = wordVocab[word];
           wvb.set([i, pos], wvb.get([i, pos]) + 1);
         }
@@ -132,7 +141,7 @@ export function matrixize(inScript, params) {
   // 長さを1に規格化するのであれば意味がないため省略
 
   // 条件タグ部分の行列。成分は+1,0,-1のいずれかで、
-  // 類似度計算の際は正規化せずに内積を取り、それをtagWeight倍して
+  // 類似度計算の際は正規化せずに内積を取り、それをcondWeight倍して
   // fvの内積に加える
 
   const inv_wv = apply(wv, 1, x => divide(1, norm(x) || 1 ));
@@ -202,11 +211,13 @@ export function preprocess(script, validAvatars) {
   let tagDict = {};
   let withLine = "";
   let avatar = "peace";
-  let tagWeight = DEFAULT_TAG_WEIGHT;
+  let condWeight = DEFAULT_TAG_WEIGHT;
+  let minIntensity = DEFAULT_MIN_INTENSITY;
+  let retention = DEFAULT_RETENTION;
   let tailing = DEFAULT_TAILING;
-  let isNonWithExists = false;
-  let isInputExists = false;
   let isOutputExists = false;
+  let isInputExists = false;
+  let isCopusSection = false;
   let prevKind = null;
   let re_va = RegExp("^(" + validAvatars.join("|") + "|bot) (.*)$");
   let warnings = [];
@@ -227,8 +238,46 @@ export function preprocess(script, validAvatars) {
 
   for (i = 0, l = script.length; i < l; i++) {
     let line = script[i];
-    // コメント除去
+    // コメント
     if (line.startsWith('#')) continue;
+    
+    // avatar文
+    // デフォルトアバターを指定。botで始まる行に適用される
+
+    if (line.startsWith('avatar ')) {
+      let a = line.slice(7);
+      if (validAvatars.includes(a)) {
+        avatar = a;
+      } else {
+        warnings.push(`warning: ${i}行: avatar '${a}' は有効ではありません。無視されます。`)
+      }
+      continue;
+    }
+
+    // 各種パラメータ文
+    let a = getFloatParam('condWeight',line,i,warnings);
+    if(a){
+      condWeight = a;
+      continue;
+    }
+
+    a = getFloatParam('tailing', line, i, warnings);
+    if(a){
+      tailing = a;
+      continue;
+    }
+
+    a = getFloatParam('minIntensity', line, i, warnings);
+    if(a){
+      minIntensity = a;
+      continue;
+    }
+
+    a = getFloatParam('retention', line, i, warnings);
+    if(a){
+      retention = a;
+      continue;
+    }
 
     // タグ
     const found = line.match(RE_TAG_LINE);
@@ -240,7 +289,7 @@ export function preprocess(script, validAvatars) {
     // with文
     // uesr,botより先に記述しなければならない。警告を返し無視される
     if (line.startsWith('with ')) {
-      if (!isNonWithExists) {
+      if (!isCopusSection) {
         withLine = withLine + line.slice(5);
       } else {
         warnings.push(`warning: ${i}行でwith行がbotやuser行よりあとに使用されました。無視されます`)
@@ -248,42 +297,9 @@ export function preprocess(script, validAvatars) {
       continue;
     }
 
-    // avatar文
-    // デフォルトアバターを指定。botで始まる行に適用される
+    // 
 
-    if (line.startsWith('avatar ')) {
-      let a = line.slice(7);
-      if (validAvatars.includes(a)) {
-        avatar = a;
-      } else {
-        warnings.push(`warning: ${i}行: avatar '${a}' は有効ではありません。無視されます。`)
-      }
-      isNonWithExists = true;
-      continue;
-    }
-
-    // tagWeight文
-    if (line.startsWith('tagWeight ')) {
-      let a = line.slice(10);
-      if (!isNaN(a)) {
-        tagWeight = parseFloat(a);
-      } else {
-        warnings.push(`warnings: ${i}行: tagWeight ${a} は有効ではありません`)
-      }
-      continue;
-    }
-
-    // tailing文
-    if (line.startsWith('tailing ')) {
-      let a = line.slice(8);
-      if (!isNaN(a)) {
-        tailing = parseFloat(a);
-      } else {
-        warnings.push(`warnings: ${i}行で指定されたtailingは有効ではありません`)
-      }
-      continue;
-    }
-
+   
     // env行
     if (line.startsWith("env ")) {
       const c = line.slice(4);
@@ -303,7 +319,7 @@ export function preprocess(script, validAvatars) {
         block.push(`user ${c}${withLine}`)
       }
       prevKind = KIND_ENV;
-      isNonWithExists = true;
+      isCopusSection = true;
       isInputExists = true;
       continue
     }
@@ -326,7 +342,7 @@ export function preprocess(script, validAvatars) {
         block.push(line + withLine);
       }
       prevKind = KIND_USER;
-      isNonWithExists = true;
+      isCopusSection = true;
       isInputExists = true;
       continue;
     }
@@ -345,18 +361,18 @@ export function preprocess(script, validAvatars) {
         block.push(line)
       }
       prevKind = KIND_BOT;
-      isNonWithExists = true;
+      isCopusSection = true;
       isOutputExists = true;
       continue;
     }
 
-
-
-    // 空行はブロックの終わりとみなす。
+    // コーパスセクションでは空行はブロックの終わりとみなす。
     // 連続した空行は一つとみなす
     if (line.match(RE_BLANK_LINE)) {
-      appendBlock();
-      prevKind=null;
+      if(isCopusSection){
+        appendBlock();
+        prevKind=null;
+      }
       continue;
     }
 
@@ -379,8 +395,10 @@ export function preprocess(script, validAvatars) {
       script: newScript,
       params: {
         tagDict: tagDict,
-        tagWeight: tagWeight,
+        condWeight: condWeight,
         tailing: tailing,
+        minIntensity: minIntensity,
+        retention: retention,
       }
     }
   } else {
@@ -389,11 +407,27 @@ export function preprocess(script, validAvatars) {
       script: newScript,
       params: {
         tagDict: tagDict,
-        tagWeight: tagWeight,
+        condWeight: condWeight,
         tailing: tailing,
+        minIntensity: minIntensity,
+        retention: retention,
       }
     }
   }
+}
+
+function getFloatParam(name,line,i,warnings){
+  if(line.startsWith(`${name}` )){
+    let a = line.slice(name.length+1);
+    if(!isNaN(a)){
+      return a;
+    }
+    else {
+      warnings.push(`warnings: ${i}行: ${name} ${a} は有効ではありません。無視されます`);
+      return false;
+    }
+  }
+  return false;
 }
 
 export function delayEffector(size, level) {

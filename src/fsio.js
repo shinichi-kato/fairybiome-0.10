@@ -26,11 +26,12 @@ export async function uploadScheme(firestore, botId, data, avatarDict) {
     if (fn === 'main') {
       await setDoc(botRef, {
         ...data[fn],
-        ownerId: botId
+        ownerId: botId,
+        validAvatars: avatars,
       })
     } else {
-      const partRef = collection(botRef, 'part');
-      await setDoc(doc(partRef, fn), { ...data[fn], validAvatars: avatars });
+      const partsRef = collection(botRef, 'parts');
+      await setDoc(doc(partsRef, fn), data[fn]);
     }
   }
 }
@@ -54,5 +55,7 @@ export async function downloadScheme(firestore, uid) {
     parts[doc.id] = doc.data()
   })
 
-  return { main: main, parts: parts };
+  console.log("downloadshceme",main);
+  console.log("parts",parts)
+  return { payload: {main: main, ...parts }};
 }
