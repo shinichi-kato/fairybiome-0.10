@@ -27,7 +27,7 @@ const schemeData = {
 
 describe('central core', () => {
   it('scheme data prapration', async () => {
-    const r = await db.saveScheme('test', schemeData);
+    const r = await db.saveScheme('test', {main: schemeData});
     expect(r).toBe(true);
   });
 

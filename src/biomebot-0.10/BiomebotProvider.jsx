@@ -103,24 +103,10 @@ function getBotName2RelativeDir(data) {
   return d;
 }
 
-function getAvatarNameDict(data) {
-  let d = {};
-  console.log(data);
-  data.allFile.nodes.forEach(n => {
-    const dir = n.relativeDirectory;
-    if (dir in d) {
-      d[dir].push(n.name);
-    } else {
-      d[dir] = [n.name];
-    }
-  });
-  return d;
-}
-
 function getValidBotAvatars(data, avatarDir) {
   let avatars = [];
   for (let node of data.allFile.nodes) {
-    if (node.avatarDir === avatarDir) {
+    if (node.relativeDirectory === avatarDir) {
       avatars.push(node.name);
     }
   }
@@ -207,7 +193,7 @@ function reducer(state, action) {
         flags: {
           ...state.flags,
           partDeployed: state.flags.partDeployed + 1,
-          deploy: completed ? 'done' : action.flags.deploy
+          deploy: completed ? 'done' : state.flags.deploy
         }
       }
     }
@@ -316,14 +302,13 @@ export default function BiomebotProvider({ firestore, children }) {
       if (flags.upload_scheme === 'done') {
         const botId = auth.uid;
 
-        db.getPartNamesAndAvatarDir(botId).then(({partNames, avatarDir}) => {
+        db.getPartNamesAndAvatarDir(botId).then(({partNames,avatarDir}) => {
           // partのデプロイ
           console.log("deployParts",partNames,avatarDir)
           partWorkersRef.current = [];
 
           const numOfParts = partNames.length;
           const validBotAvatars = getValidBotAvatars(chatbotsSnap, avatarDir);
-
           for (let pn of partNames) {
             const pw = new PartWorker();
             pw.onmessage = function (event) {
@@ -398,7 +383,6 @@ export default function BiomebotProvider({ firestore, children }) {
       console.log("upload_scheme");
       let data = {};
       const botId = auth.uid;
-      const avatarDict = getAvatarNameDict(chatbotsSnap);
       let dir;
       (async () => {
         if (!await isExistUserChatbot(firestore, auth.uid)) {
@@ -430,7 +414,7 @@ export default function BiomebotProvider({ firestore, children }) {
 
           // firestoreに上書き
           
-          await uploadScheme(firestore, botId, data, avatarDict);
+          await uploadScheme(firestore, botId, data);
 
         }
         else {
@@ -440,7 +424,7 @@ export default function BiomebotProvider({ firestore, children }) {
         }
 
         // dexieに書き込む
-        await db.saveScheme(botId, data, avatarDict);
+        await db.saveScheme(botId, data);
 
         dispatch({ type: 'flag', flags: { upload_scheme: 'done' } });
       })();

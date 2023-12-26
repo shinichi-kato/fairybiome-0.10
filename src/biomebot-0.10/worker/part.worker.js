@@ -12,7 +12,7 @@ onmessage = function (event) {
   switch (action.type) {
     case 'deploy': {
       (async () => {
-        let result = await part.load(botId, action.partName);
+        let result = await part.load(botId, action.partName, action.validAvatars);
         if (result) {
           postMessage({ type: 'partLoaded', result: result });
           result = part.deploy();

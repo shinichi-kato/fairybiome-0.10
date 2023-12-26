@@ -67,36 +67,37 @@ class dbio {
     let partList = await this.db.parts.where(['botId', 'name'])
       .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
       .toArray();
-    let scheme = await this.db.scheme.where({botId: botId}).first();
-    console.log(partList)
+    let scheme = await this.db.scheme.where({ botId: botId }).first();
+    console.log(scheme)
 
     return {
       partNames: partList.map(p => p.name),
-      validAvatars: scheme.validAvatars
+      avatarDir: scheme.payload.avatarDir
     }
   }
 
   async loadScheme(botId) {
     const data = await this.db.scheme.where({ botId: botId }).first();
-    return [data.payload,data.validAvatars];
+    return data.payload;
   }
 
-  async saveScheme(botId, data, avatarDict) {
-    if('payload' in data ){
-      const payload = data.payload;
-      for (let node in payload) {
-        if (node === 'main') {
-          await this.db.scheme.put({ 
-            botId: botId, payload: payload[node], 
-            validAvatars:avatarDict[payload.main.avatarDir] })
-        }
-        else {
-          await this.db.parts.put({ botId: botId, name: node, payload: payload[node] })
-        }
+  async saveScheme(botId, data) {
+    let payload = 'payload' in data ? data.payload : data;
+
+    for (let node in payload) {
+      if (node === 'main') {
+        await this.db.scheme.put({
+          botId: botId, 
+          payload: payload[node]
+        })
       }
-      return true;
+      else {
+        await this.db.parts.put({
+          botId: botId, name: node,
+          payload: payload[node]
+        })
+      }
     }
-    await this.db.scheme.put({botId: botId, payload: data.payload})
     return true;
   }
 

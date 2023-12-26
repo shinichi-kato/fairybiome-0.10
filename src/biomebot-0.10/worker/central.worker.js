@@ -13,9 +13,9 @@ onmessage = function (event) {
 
           postMessage({
             type: 'centralDeployed',
-            avatarDir: this.avatarDir,
-            backgroundColor: this.backgroundColor,
-            displayName: this.displayName,
+            avatarDir: scheme.avatarDir,
+            backgroundColor: scheme.backgroundColor,
+            displayName: scheme.displayName,
           });
   
         }else{

@@ -16,18 +16,15 @@ export async function isExistUserChatbot(firestore, uid) {
   return botSnap.exists();
 }
 
-export async function uploadScheme(firestore, botId, data, avatarDict) {
-  // json形式で取得したdataとavatarのリストをfirestoreに書き込む
-  const avatars = avatarDict[data.main.avatarDir];
+export async function uploadScheme(firestore, botId, data) {
+  // json形式で取得したdataをfirestoreに書き込む
   const botRef = doc(firestore, 'chatbot', botId);
-
 
   for (let fn in data) {
     if (fn === 'main') {
       await setDoc(botRef, {
         ...data[fn],
         ownerId: botId,
-        validAvatars: avatars,
       })
     } else {
       const partsRef = collection(botRef, 'parts');
@@ -56,6 +53,5 @@ export async function downloadScheme(firestore, uid) {
   })
 
   console.log("downloadshceme",main);
-  console.log("parts",parts)
   return { payload: {main: main, ...parts }};
 }
