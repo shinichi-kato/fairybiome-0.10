@@ -13,6 +13,7 @@ export const scheme = {
   interval: {
     max: 3000,
     min: 800,
+    timerId: null,
   },
   response: {
     minIntensity: 0.1
@@ -33,8 +34,8 @@ export const scheme = {
     scheme.avatarDir = data.avatarDir;
     scheme.backgroundColor = data.backgroundColor;
     scheme.interval = {
-      ...scheme.interval,
       ...data.interval,
+      timerId: null,
     };
     scheme.response = { ...data.response };
     scheme.memory = { ...data.memory };
@@ -64,9 +65,7 @@ export const scheme = {
     // }
     console.log("run",scheme.interval)
     if (scheme.innerOutputs.length !== 0) {
-      console.log("chake")
       const reply = pickRandom(scheme.innerOutputs)
-      console.log(reply.text)
 
       const message = new Message('bot', {
         avatarDir: scheme.avatarDir,
@@ -81,8 +80,13 @@ export const scheme = {
 
       scheme.innerOutputs = [];
     }
-    return true;
 
+    scheme.interval.timerId = setTimeout(
+      scheme.run.bind(this),
+      random(scheme.interval.min, scheme.interval.max)
+    );
+
+    return true;
   },
 
   kill: () => {

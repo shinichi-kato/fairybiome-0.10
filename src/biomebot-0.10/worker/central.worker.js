@@ -1,18 +1,21 @@
 // central worker
 import {scheme} from './central.core';
 
-onmessage = function (event) {
+
+onmessage = (event) => {
   const action = event.data;
   const botId = action.botId;
+  console.log(action);
   switch (action.type) {
     case 'deploy': {
       // dbからロードし、行列計算
       (async () => {
-        let r = await scheme.load(botId) && scheme.run();
+        let r = await scheme.load(botId);
         if(r){
 
           postMessage({
             type: 'centralDeployed',
+            interval: scheme.interval,
             avatarDir: scheme.avatarDir,
             backgroundColor: scheme.backgroundColor,
             displayName: scheme.displayName,
@@ -27,8 +30,13 @@ onmessage = function (event) {
       })();
       break;
     }
-    case 'recieve': {
+    case 'input': {
       scheme.recieve(action.message);
+      break;
+    }
+    case 'run': {
+      console.log("run0")
+      scheme.run();
       break;
     }
     case 'kill': {

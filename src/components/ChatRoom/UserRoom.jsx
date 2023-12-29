@@ -91,7 +91,7 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
     let channel = new BroadcastChannel('biomebot');
     channel.onmessage = (event) => {
       const action = event.data;
-      if (action.type === 'botSpeech') {
+      if (action.type === 'output') {
         writeLog(action.message);
       }
     }
@@ -115,6 +115,14 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
     })
     writeLog(msg);
     bot.postUserMessage(msg);
+    setText("");
+  }
+
+  //-----------------------------------
+
+  function handleToBack(){
+    bot.pause();
+    handleToMainMenu();
   }
 
   return (
@@ -129,7 +137,7 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
         <ConsoleBar
           text={text}
           handleChangeText={handleChangeText}
-          handleToBack={handleToMainMenu}
+          handleToBack={handleToBack}
           handleSend={handleSend}
         />
       </Box>

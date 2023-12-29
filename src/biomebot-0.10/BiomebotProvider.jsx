@@ -51,11 +51,12 @@ import { AuthContext } from '../components/Auth/AuthProvider';
 
 import { isExistUserChatbot, uploadScheme, downloadScheme } from '../fsio.js';
 import { db } from '../dbio.js';
-import {randomInt} from 'mathjs';
+import {randomInt, random} from 'mathjs';
 // import { Message } from '../message.js';
 
 import CentralWorker from './worker/central.worker';
 import PartWorker from './worker/part.worker';
+import useInterval from './useInterval';
 
 export const BiomebotContext = createContext();
 
@@ -120,7 +121,13 @@ const initialState = {
   avatarDir: "default",
   botState: "unload",
   numOfparts: 0,
-  flags: {},
+  interval: {min: 800,max:2000,current: null},
+  flags: {
+    centralLoaded: 0,
+    centralDeployed: 0,
+    partLoaded: 0,
+    partDeployed: 0
+  },
 }
 
 function reducer(state, action) {
@@ -133,9 +140,8 @@ function reducer(state, action) {
         botId: action.botId,
         botState: 'loading',
         flags: {
+          ...initialState.flags,
           load: 'req',
-          centralLoaded: 0,
-          partLoaded: 0
         }
       }
     }
@@ -145,9 +151,7 @@ function reducer(state, action) {
       return {
         ...state,
         botState: completed ? 'loaded' : 'loading',
-        avatarDir: action.avatarDir,
-        backgroundColor: action.backgroundColor,
-        displayName: action.displayName,
+
         flags: {
           ...state.flags,
           centralLoaded: 1,
@@ -160,11 +164,31 @@ function reducer(state, action) {
       return {
         ...state,
         botState: completed ? 'deployed' : 'deploying',
-
+        interval: {
+          ...action.interval,
+          current: completed ? 1000 : null
+        },
+        avatarDir: action.avatarDir,
+        backgroundColor: action.backgroundColor,
+        displayName: action.displayName,
         flags: {
           ...state.flags,
           centralDeployed: 1,
           deploy: completed ? 'done' : state.flags.deploy
+        }
+      }
+    }
+
+    case 'setNextInterval': {
+      const imin = state.interval.min;
+      const imax = state.interval.max;
+      const interv = random(imin,imax);
+      return {
+        ...state,
+        interval:{
+          min:imin,
+          max:imax,
+          current: interv
         }
       }
     }
@@ -190,6 +214,10 @@ function reducer(state, action) {
       return {
         ...state,
         botState: completed ? 'deployed' : 'deploying',
+        interval: {
+          ...state.interval,
+          current: completed ? 1000 : null
+        },
         flags: {
           ...state.flags,
           partDeployed: state.flags.partDeployed + 1,
@@ -228,12 +256,21 @@ function reducer(state, action) {
     }
 
     case 'flag': {
-      console.log(action.flags)
       return {
         ...state,
         flags: {
           ...state.flags,
           ...action.flags
+        }
+      }
+    }
+
+    case 'pause':{
+      return {
+        ...state,
+        interval:{
+          ...state.interval,
+          current: null
         }
       }
     }
@@ -247,13 +284,24 @@ export default function BiomebotProvider({ firestore, children }) {
   const auth = useContext(AuthContext);
   const [state, dispatch] = useReducer(reducer, initialState);
   const [msgQueue, setMsgQueue] = useState([]);
-  const centralWorkerRef = useRef();
+  const centralWorkerRef = useRef(new CentralWorker());
   const partWorkersRef = useRef([]);
 
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const flags = state.flags;
 
-
+  useEffect(()=>{
+    let cw;
+    if(centralWorkerRef.current === null){
+      centralWorkerRef.current = new CentralWorker();
+      cw = centralWorkerRef.current;
+    }
+    return (()=>{
+      cw.terminate();
+      cw = undefined;
+    })
+  },[]);
+ 
   //-------------------------------------------
   // 制約充足：ユーザ発言の受付け
   //
@@ -263,6 +311,7 @@ export default function BiomebotProvider({ firestore, children }) {
   function postUserMessage(message) {
     if (flags.deploy === 'done') {
       // workerが起動していればchannelにメッセージをポスト
+      dispatch({type: 'setNextInterval'});
       centralWorkerRef.current.postMessage({ type: 'input', message: message });
     } else {
       // 起動前だったら起動。起動前に受け取ったメッセージは最後の
@@ -282,6 +331,7 @@ export default function BiomebotProvider({ firestore, children }) {
 
   useEffect(() => {
     if (flags.deploy === 'done' && msgQueue.length !== 0) {
+      
       for (let m of msgQueue) {
         // 一度にpostしてOKか？
         centralWorkerRef.current.postMessage({ type: 'input', message: m });
@@ -290,6 +340,18 @@ export default function BiomebotProvider({ firestore, children }) {
     }
 
   }, [flags.deploy, msgQueue]);
+
+  //-------------------------------------------
+  // 制約充足：チャットボットの起動
+  //
+  // chatbotが返答をするためのペーサーを起動
+  // 
+
+  useInterval(()=>{
+    centralWorkerRef.current.postMessage({type:'run'});
+    dispatch({type:'setNextInterval'});
+
+  },state.interval.current);
 
   //-------------------------------------------
   // 制約充足：workerのdeploy
@@ -304,13 +366,13 @@ export default function BiomebotProvider({ firestore, children }) {
 
         db.getPartNamesAndAvatarDir(botId).then(({partNames,avatarDir}) => {
           // partのデプロイ
-          console.log("deployParts",partNames,avatarDir)
           partWorkersRef.current = [];
 
           const numOfParts = partNames.length;
           const validBotAvatars = getValidBotAvatars(chatbotsSnap, avatarDir);
           for (let pn of partNames) {
-            const pw = new PartWorker();
+            partWorkersRef.current.push(new PartWorker());
+            let pw = partWorkersRef.current[partWorkersRef.current.length-1];
             pw.onmessage = function (event) {
               const type = event.data.type;
               // partLoaded, partNotFound, partDeployedをディスパッチ
@@ -324,13 +386,13 @@ export default function BiomebotProvider({ firestore, children }) {
               partName: pn,
               validAvatars: validBotAvatars
             })
-            partWorkersRef.current.push(pw)
           }
 
           // centralのデプロイ
           console.log("deployScheme");
 
-          const cw = new CentralWorker();
+          // centralWorkerRef.current = new CentralWorker();
+          let cw = centralWorkerRef.current;
           cw.onmessage = function (event) {
             console.log(event.data);
             const type = event.data.type;
@@ -353,7 +415,8 @@ export default function BiomebotProvider({ firestore, children }) {
             type: 'deploy',
             botId: botId
           });
-          centralWorkerRef.current = cw;
+
+          
         })
 
       } else {
@@ -364,7 +427,6 @@ export default function BiomebotProvider({ firestore, children }) {
 
     }
     return () => {
-      centralWorkerRef.current?.terminate();
       partWorkersRef.current.map(p => p.terminate());
     }
   },
@@ -436,13 +498,16 @@ export default function BiomebotProvider({ firestore, children }) {
 
   }, [flags.upload_scheme, auth.uid, chatbotsSnap, firestore, msgQueue.length, msgQueue]);
 
-
+  function pause(){ dispatch({type: 'pause'}) }
+  function restart(){ dispatch({type: 'setNextInterval'})}
 
   return (
     <BiomebotContext.Provider
       value={{
         state: state,
         postUserMessage: postUserMessage,
+        pause: pause,
+        restart: restart
       }}
     >
       {children}
