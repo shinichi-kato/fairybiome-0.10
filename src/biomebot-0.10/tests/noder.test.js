@@ -1,20 +1,21 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 import { noder } from '../worker/noder';
+import { Message } from '../../message';
 
 describe("noder", () => {
-  const text="しずくは、お兄さんの課題を君に。{+test}";
+  const message= new Message('user',{
+    text:"しずくは、お兄さんの課題を君に。{+test}",
+    tagDict:{"{tag}":1}
+  });
 
   it('load memory', ()=>{
-    noder.load({
-
-    })
+    noder.load({'{BOT_NAME}':'しずく'})
 
     expect().toBe();
   });
 
-  it(`run(${text}`, () => {
-    noder.load({'{BOT_NAME}':'しずく'})
-    const result = noder.run(text);
+  it(`run(${message.text}`, () => {
+    const result = noder.run(message);
     console.log(result);
 
     expect(result[3].feat).toBe('{2}')

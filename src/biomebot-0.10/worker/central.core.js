@@ -1,8 +1,17 @@
 // central worker
+//
+// memory
+// {BOT_NAME} : チャットボットの名前
+// {BOT_NICKNAMES}: チャットボットのニックネーム配列
+// {BOT_ANSWER_REQUIRED}: ユーザがボットに話しかけた
+// {CURRENT_COND_TAGS}:  
+
 import { db } from '../../dbio.js';
 import { random, pickRandom } from 'mathjs';
 import { Message } from '../../message';
 import { noder } from './noder';
+
+const RE_PERSISTENT_TAG = /^[A-Z][A-Za-z0-9_]*$/;
 
 export const scheme = {
   botId: null,
@@ -15,7 +24,9 @@ export const scheme = {
     min: 800,
   },
   response: {
-    minIntensity: 0.1
+    minIntensity: 0.1,  // この値よりもスコアが小さい返答は採用しない
+
+
   },
   memory: {},
   parts: [],
@@ -62,9 +73,9 @@ export const scheme = {
     //   score: retr.score,
     //   avatar: rndr.avatar,
     // }
-    console.log("run",scheme.interval)
+    console.log("run")
     if (scheme.innerOutputs.length !== 0) {
-      console.log("chake")
+      // ↓一番スコアの高いものに差し替えること
       const reply = pickRandom(scheme.innerOutputs)
       console.log(reply.text)
 
@@ -77,20 +88,60 @@ export const scheme = {
         avatar: reply.avatar
       });
 
-      scheme.channel.postMessage({type:'output',message:message});
+      let cond = {}
+      for (let key in reply.pendingCond) {
+        if (RE_PERSISTENT_TAG.test(key)) {
+          cond[key] = reply.pendingCond[key]
+        }
+      }
+
+
+      scheme.channel.postMessage({
+        type: 'output', message: message,
+        partName: reply.partName,
+        cond: cond
+      });
 
       scheme.innerOutputs = [];
+    } else if ('{BOT_ANSER_REQUIRED' in scheme.memory) {
+      const req = scheme.memory['{BOT_ANSER_REQUIRED']
+      if (req === 1) {
+        // ユーザやボットからなにか言われたが返答していない場合、
+        // 無言だったことを内言する。内言しても応答できなかった
+        // 場合(req>1)は無理にしゃべらない
+
+        const message = new Message('bot', {
+          avatarDir: scheme.avatarDir,
+          speakerName: scheme.displayName,
+          speakerId: scheme.botId,
+          backgroundColor: "",
+          avatar: "",
+          text: "{?SILENCE}"
+        })
+        scheme.channel.postMessage({ type: 'input', message: message });
+      }
     }
+
+    scheme.memory['{BOT_ANSWER_REQUIRED'] = null;
     return true;
 
   },
 
   kill: () => {
     clearTimeout(scheme.interval.timerId);
+    scheme.channel.terminate();
   },
 
   recieve: (message) => {
-    console.log("central.core recieved")
+    console.log("central.core recieved");
+
+    if (message.kind !== 'env') {
+      if ('{BOT_ANSWER_REQUIRED}' in scheme.memory) {
+        scheme.memory["{BOT_ANSWER_REQUIRED}"]++;
+      } else {
+        scheme.memory["{BOT_ANSWER_REQUIRED}"] = 1;
+      }
+    }
     scheme.channel.postMessage({ type: 'input', message: message });
   }
 }

@@ -46,7 +46,8 @@ export const part = {
   outScript: [],
 
   handleInput: (action) => {
-    const retr = retrieve(action.message.text);
+    const retr = retrieve(action.message);
+    console.log(retr)
     if (retr.score > part.response.minIntensity) {
       const rndr = part.render(retr.index);
 
@@ -56,6 +57,7 @@ export const part = {
         text: rndr.text,
         score: retr.score,
         avatar: rndr.avatar,
+        pendingCond: part.pendingCond
       })
     }
   },
@@ -117,7 +119,7 @@ export const part = {
       minIntensity: params.minIntensity,
       retention: params.retention,
     },
-    part.wordVocabLength = mt.wordVocabLength;
+      part.wordVocabLength = mt.wordVocabLength;
     part.condVocabLength = mt.condVocabLength;
     part.wordVocab = mt.wordVocab;
     part.condVocab = mt.condVocab;
@@ -135,15 +137,24 @@ export const part = {
     }
   },
 
-  retrieve: (text) => {
+  retrieve: (message) => {
     /* 
       入力文字列を受取り、スコアを返す
       wordVectorは正規化してwordMatrixとの内積。
       condVectorはそのままcondMatrixとの内積を計算してcondWeight倍する。
       両者を加えたものをscoreとする
     */
+    let text = message.text;
+    let tagDict = message.tagDict;
     let wv = zeros(1, part.wordVocabLength);
     let cv = zeros(1, part.condVocabLength);
+
+    // messageにcondTagsが含まれていたらそれを考慮に入れる
+    for (let tag in tagDict) {
+      const pos = part.condVocab[tag];
+      cv.set([0, pos], tagDict[tag] * part.condWeight);
+    }
+
 
     let nodes = noder.run(text);
 
@@ -154,9 +165,9 @@ export const part = {
         wv.set([0, pos], wv.get([0, pos]) + 1);
       } else {
         const m = feat.match(RE_IN_COND_TAG);
-        if(m){
+        if (m) {
           let pos = part.condVocab[m[2]];
-          cv.set([0,pos], m[1] === '?' ? part.condWeight: -part.condWeight);
+          cv.set([0, pos], m[1] === '?' ? part.condWeight : -part.condWeight);
         }
       }
       /*
@@ -250,8 +261,8 @@ export const part = {
     let text = newNodes.map(n => n.surface).join("");
     let feeds = text.split('\f');
     let queue = [];
-    if(feeds.length> 1){
-      for(let feed of feeds.slice(1)){
+    if (feeds.length > 1) {
+      for (let feed of feeds.slice(1)) {
         feed = feed.match(RE_OUTSCRIPT)
         queue.push({
           avatar: feed[1],
@@ -285,23 +296,23 @@ export const part = {
     return {
       avatar: avatar,
       text: text,
-      queue: queue
+      queue: queue,
     }
   },
 
   activate: () => {
     // 直前のrenderが採用された
-    // retentionチェックが成功したら{?activated}を+に
+    // retentionチェックが成功したら{?ACTIVATED}を+に
     // CondVectorを更新
-    let pos = part.condVocab['activated'];
+ 
+    let pos = part.condVocab['ACTIVATED'];
     console.log(part.condVector)
-    part.condVector.set([0,pos],part.condWeight);
+    part.condVector.set([0, pos], part.condWeight);
 
-    for(let key in part.pendingCond){
+    for (let key in part.pendingCond) {
       pos = part.condVocab[key];
-      part.condVector.set([0,pos],part.condWeight*part.pendingCond[key]);
+      part.condVector.set([0, pos], part.condWeight * part.pendingCond[key]);
     }
-    
     part.pendingCond = {};
     return true;
   },
@@ -309,16 +320,16 @@ export const part = {
   inertial: () => {
     // 直前のrenderが不採用だった
     // ・condPendingの削除
-    if(part.retention > random()){
-      let pos = part.condVocab['activated'];
-      part.condVector.set([0,pos],-part.condWeight);
+    if (part.retention > random()) {
+      let pos = part.condVocab['ACTIVATED'];
+      part.condVector.set([0, pos], -part.condWeight);
     }
     part.pendingCond = {};
   }
 };
 
 
-channel.onmessage = function (event) {
+channel.onmessage = event => {
   const action = event.data;
   // const botId = action.botId;
   switch (action.type) {

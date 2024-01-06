@@ -1,4 +1,6 @@
 import React, { useState, useContext, useEffect, useCallback } from 'react';
+import { useStaticQuery, graphql } from "gatsby";
+
 import Box from '@mui/material/Box';
 
 import FairyPanel from '../Panel/FairyPanel';
@@ -16,11 +18,23 @@ import {
 
 const panelWidth = 192;
 
+
+
 export default function UserRoom({ firestore, handleToMainMenu }) {
   const bot = useContext(BiomebotContext);
   const auth = useContext(AuthContext);
   const [text, setText] = useState("");
   const [log, setLog] = useState([]);
+
+  const siteSnap = useStaticQuery(graphql`
+  query {
+    site {
+      siteMetadata {
+        balloonBackgroundAlpha
+      }
+    }
+  }
+  `);
 
   //------------------------------------------------
   // ログの購読
@@ -71,6 +85,7 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
       await addDoc(logRef, {
         text: message.text,
         speakerName: message.speakerName,
+        speakerId: message.speakerId,
         timestamp: serverTimestamp(),
         avatarDir: message.avatarDir,
         avatar: message.avatar,
@@ -120,7 +135,7 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
 
   //-----------------------------------
 
-  function handleToBack(){
+  function handleToBack() {
     bot.pause();
     handleToMainMenu();
   }
@@ -146,7 +161,10 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
           flexGrow: 1
         }}
       >
-        <LogViewer log={log} uid={auth.uid}/>
+        <LogViewer
+          log={log}
+          uid={auth.uid}
+          bgAlpha={siteSnap.site.siteMetadata.balloonBackgroundAlpha} />
       </Box>
       <Box
         sx={{

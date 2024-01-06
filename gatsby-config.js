@@ -56,6 +56,7 @@ module.exports = {
       '#d58b5f', // orange
       '#c4736e', // red
       '#9e88aa', // purple
-    ]
+    ],
+    balloonBackgroundAlpha: 0.8
   },
 }

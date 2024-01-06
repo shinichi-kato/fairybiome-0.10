@@ -34,9 +34,9 @@ action名        update_scheme
 処理            firestore上にチャットボットの最新データ(.json)をコピー
                 複合語辞書をdexieDB上にコピー
 
-これらの制約充足の管理にはactionsを使う。
-actions['matrix_load'] = 'req' リクエストされた
-actions['matrix_load'] = 'done' 完了した
+これらの制約充足の管理にはflagsを使う。
+flags['matrix_load'] = 'req' リクエストされた
+flags['matrix_load'] = 'done' 完了した
 
 
 ## API
@@ -66,7 +66,7 @@ textには{env.user_login}、{env.morning}などのタグを用いる。{env.*}
 
 ## 会話の動作機序
 
-1. {type: 'user_input'}または{type: 'environment_input'}を受け取ったとき、チャットボットが
+1. {type: 'input'}を受け取ったとき、チャットボットが
 起動していなければ起動する
 
 2. ユーザが発言した場合、それを{type: 'user_input'}として投入する。

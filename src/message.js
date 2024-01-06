@@ -22,7 +22,7 @@ export class Message {
     this.speakerId = null;
     this.text = null;
     this.nodes = [];
-    this.tags = {};
+    this.tagDict = {};
     this.avatarDir = "";
     this.avatar = "";
     this.timestamp = null;
@@ -50,7 +50,7 @@ export class Message {
           this.speakerName = data.speakerName;
           this.speakerId = data.speakerId;
           this.nodes = [];
-          this.tags = {};
+          this.tagDict = data.tagDict || {};
           this.avatarDir = data.avatarDir;
           this.timestamp = data.timestamp;
           this.backgroundColor = data.backgroundColor;
@@ -59,12 +59,24 @@ export class Message {
         }
         break;
       }
+      case 'env': {
+        this.sperkerName = "環境";
+        this.spakerId = null;
+        this.text = data ? data.text: null;
+        this.nodes = [];
+        this.tagDict = {};
+        this.avatarDir = null;
+        this.avatar = null;
+        this.timestamp = data ? data.timestamp : null;
+        this.kind = kind;
+        return ;
+      }
       case 'system': {
         this.speakerName = null;
         this.speakerId = null;
         this.text = data ? data.text : null;
         this.nodes = [];
-        this.tags = {};
+        this.tagDict = {};
         this.avatarDir = null;
         this.avatar = null;
         this.timestamp = data ? data.timestamp : null;
@@ -76,8 +88,13 @@ export class Message {
         throw new Error(`invalid kind ${kind}`);
     }
   }
+  
   contains(text) {
     return this.text !== null && this.text.indexOf(text) !== -1
+  }
+
+  setCondition(dict){
+    this.tagDict=Object.assign(this.tagDict,dict);
   }
 
 }

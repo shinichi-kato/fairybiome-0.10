@@ -17,6 +17,10 @@ const DEFAULT_TAILING = 0.2;
 const DEFAULT_MIN_INTENSITY = 0.1;
 const DEFAULT_RETENTION = 0.4;
 
+const SYSTEM_COND_TAGS = [
+  "ACTIVATED","SILENCE"
+]
+
 export function matrixize(inScript, params) {
   /* inスクリプトから類似度計算用の行列を生成する。
     inスクリプトはブロックのリストで各ブロックはuser行のみが
@@ -72,13 +76,11 @@ export function matrixize(inScript, params) {
   const wordVocabKeys = Object.keys(wordVocab);
 
   // 必須のcondVocabを追加
-  condVocabKeys.push('activated');
+  condVocabKeys.concat(SYSTEM_COND_TAGS);
 
   // condVocab,wordVocabともに1つしか要素がない場合
   // dot()計算が失敗するのでダミーを加える
-  if(condVocabKeys.length === 1){
-    condVocabKeys.push('__dummy__')
-  }
+ 
   if(wordVocabKeys.length === 1){
     wordVocabKeys.push('__dummy__');
   }

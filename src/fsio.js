@@ -42,7 +42,7 @@ export async function downloadScheme(firestore, uid) {
 
   const botRef = doc(firestore, 'chatbot', uid);
   const mainSnap = await getDoc(botRef);
-  if(mainSnap.exists()){
+  if (mainSnap.exists()) {
     main = mainSnap.data();
   }
 
@@ -52,6 +52,29 @@ export async function downloadScheme(firestore, uid) {
     parts[doc.id] = doc.data()
   })
 
-  console.log("downloadshceme",main);
-  return { payload: {main: main, ...parts }};
+  console.log("downloadshceme", main);
+  return { payload: { main: main, ...parts } };
+}
+
+
+
+export async function getPersistentCondition(firestore, botId, partName) {
+  const collectionRef = collection(firestore, "chatbot", botId, "partCondition");
+  const snap = await getDoc(doc(collectionRef, partName));
+  if (snap.exists()) {
+    return snap.data();
+  }
+  return {};
+}
+
+export async function setPersistentCondition(firestore, botId, partName, condDict) {
+  // condDictは{ cond名: 値 }という形式でCondVectorの要素が格納されている
+
+  const collectionRef = collection(firestore, "chatbot", botId, "partCondition");
+
+  await setDoc(doc(collectionRef, partName, condDict))
+}
+
+export async function clearPersistentCondition(firestore, botId, partName) {
+  await setPersistentCondition(firestore, botId, partName, {});
 }

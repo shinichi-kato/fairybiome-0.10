@@ -115,26 +115,26 @@ export class Noder {
   }
 
   run(text) {
-    let tags = {};
+    let tagDict = {};
     let nodes = [];
     let i = 0;
 
     // 条件タグと展開タグ：透過
     text = text.replace(RE_TAG, match => {
-      tags[i] = { surf: match, feat: match };
+      tagDict[i] = { surf: match, feat: match };
       return `\v${i++}\v`;
     })
 
     // システムタグ：タグ化
     for (const [key, value] of this.systemTagMap2) {
       if(text.indexOf(key) !== -1){
-        tags[i] = {surf: key, feat: value }
+        tagDict[i] = {surf: key, feat: value }
         text = text.replace(key, `\v${i++}\v`);
       }
     }
     for (const [key, value] of this.systemTagMap1) {
       if(text.indexOf(key) !== -1){
-        tags[i] = {surf: key, feat: value }
+        tagDict[i] = {surf: key, feat: value }
         text = text.replace(key, `\v${i++}\v`);
       }
     }
@@ -142,7 +142,7 @@ export class Noder {
     // ICIタグ該当語句：タグ化
     for (const [key, value] of this.ICITagMap) {
       if (text.indexOf(key) !== -1) {
-        tags[i] = { surf: key, feat: `{${value}}` }
+        tagDict[i] = { surf: key, feat: `{${value}}` }
         text = text.replace(key, `\v${i++}\v`);
       }
     }
@@ -156,7 +156,7 @@ export class Noder {
       } else 
       if(phase === 1){
         console.error(seg)
-        let t = tags[seg];
+        let t = tagDict[seg];
         nodes.push(new Node(t.surf,t.feat))
         phase = 2;
         continue;

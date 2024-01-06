@@ -35,7 +35,6 @@ onmessage = (event) => {
       break;
     }
     case 'run': {
-      console.log("run0")
       scheme.run();
       break;
     }
