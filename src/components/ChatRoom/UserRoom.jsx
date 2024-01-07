@@ -99,6 +99,23 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
     setText(e.target.value);
   }
 
+  const writeError = useCallback(result => {
+    console.log(result);
+    (async () => {
+      const logRef = collection(firestore, "users", auth.uid, "log");
+      await addDoc(logRef, {
+        text: result.messages.join('\n'),
+        speakerName: result.partName,
+        speakerId: null,
+        timestamp: serverTimestamp(),
+        avatarDir: "",
+        avatar: "",
+        backgroundColor: "#FFBBBB",
+        kind: "sys"
+      })
+    })();
+  }, [firestore, auth.uid]);
+
   //------------------------------------------------
   // チャットボット発言のレンダリング
   //
@@ -108,10 +125,12 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
       const action = event.data;
       if (action.type === 'output') {
         writeLog(action.message);
+      } else if (action.type === 'error') {
+        writeError(action.result);
       }
     }
     return () => { channel.close() }
-  }, [writeLog]);
+  }, [writeLog, writeError]);
 
 
   //-----------------------------------------------
@@ -158,6 +177,9 @@ export default function UserRoom({ firestore, handleToMainMenu }) {
       </Box>
       <Box
         sx={{
+          height: "calc ( 100vh - 48px - 256px )",
+          overflowY: "scroll",
+          alignItems: 'flex-end',
           flexGrow: 1
         }}
       >

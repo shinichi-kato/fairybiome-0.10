@@ -57,7 +57,7 @@ export function matrixize(inScript, params) {
         if(feat.startsWith('{!')){
           return {
             status: 'error',
-            message: [`${i}行に不正なタグ${feat}が見つかりました。{?!~}を使ってください`]
+            messages: [`${i}行に不正なタグ${feat}が見つかりました。{?!~}を使ってください`]
           }
         
         }else {
@@ -200,7 +200,7 @@ export function tee(script) {
 
 export function preprocess(script, validAvatars) {
   /*
-    スクリプトを入力ー応答のブロックに分け、tagDictを別に抽出して返す
+    スクリプトをvalidateして入力ー応答のブロックに分け、tagDictを別に抽出して返す
     [
       [
         with句,user文,bot文
@@ -417,6 +417,7 @@ export function preprocess(script, validAvatars) {
     }
   }
 }
+
 
 function getFloatParam(name,line,i,warnings){
   if(line.startsWith(`${name}` )){

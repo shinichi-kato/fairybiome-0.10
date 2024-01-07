@@ -14,9 +14,11 @@ export default function MainMenu({
         flexDirection: 'column'
       }}
     >
-      <Box>
+      <Box
+        sx={{alignSelf: 'center'}}
+      >
         <img
-          src={withPrefix('/static/images/title.svg')}
+          src={withPrefix('/images/fairydoor.svg')}
           alt="title"
         />
       </Box>

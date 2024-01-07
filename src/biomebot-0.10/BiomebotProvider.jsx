@@ -49,9 +49,9 @@ import React, {
 import { useStaticQuery, graphql } from "gatsby";
 import { AuthContext } from '../components/Auth/AuthProvider';
 
-import { 
-  isExistUserChatbot, uploadScheme, downloadScheme,
-  getPersistentCondition, setPersistentCondition
+import {
+  uploadScheme, 
+  getPersistentCondition, setPersistentCondition,
 } from '../fsio.js';
 import { db } from '../dbio.js';
 import { randomInt, random } from 'mathjs';
@@ -62,6 +62,7 @@ import PartWorker from './worker/part.worker';
 import useInterval from './useInterval';
 
 export const BiomebotContext = createContext();
+
 
 const chatbotsQuery = graphql`
 query {
@@ -131,21 +132,17 @@ const initialState = {
     partLoaded: 0,
     partDeployed: 0
   },
+  channel: null
 }
 
 function reducer(state, action) {
   console.log(`biomebotProvider - ${action.type}`);
 
   switch (action.type) {
-    case 'load': {
+    case 'setChannel': {
       return {
-        ...initialState,
-        botId: action.botId,
-        botState: 'loading',
-        flags: {
-          ...initialState.flags,
-          load: 'req',
-        }
+        ...state,
+        channel: action.channel
       }
     }
 
@@ -171,6 +168,7 @@ function reducer(state, action) {
           ...action.interval,
           current: completed ? 1000 : null
         },
+        botId: action.botId,
         avatarDir: action.avatarDir,
         backgroundColor: action.backgroundColor,
         displayName: action.displayName,
@@ -300,27 +298,39 @@ export default function BiomebotProvider({ firestore, children }) {
       centralWorkerRef.current = new CentralWorker();
       cw = centralWorkerRef.current;
     }
-    return (() => {
+    console.log("open channel")
+    let c = new BroadcastChannel('biomebot');
+    dispatch({ type: 'setChannel', channel: c });
+
+    return () => {
       cw.kill();
       cw.terminate();
       cw = undefined;
-    })
+      console.log("close all channel")
+      c.postMessage({ type: 'close' });
+    }
   }, []);
 
   useEffect(() => {
-    if(firestore && auth.uid){
-      let channel = new BroadcastChannel('biomebot');
-      channel.onmessage = event => {
+    if (firestore && auth.uid && state.channel) {
+
+      state.channel.onmessage = event => {
         const action = event.data;
-        if (action.type === 'output') {
-          setPersistentCondition(firestore, auth.uid, action.partName, action.cond);
+        switch (action.type) {
+          case 'output':
+            setPersistentCondition(firestore, auth.uid, action.partName, action.cond);
+            break;
+
+          case 'close':
+            state.channel.close();
+            break;
+
+          default:
+          /* nop */
         }
       }
-      return (()=>{
-        channel.close();
-      })
     }
-  }, [auth.uid, firestore]);
+  }, [auth.uid, firestore, state.channel]);
 
 
   //-------------------------------------------
@@ -377,8 +387,8 @@ export default function BiomebotProvider({ firestore, children }) {
   //-------------------------------------------
   // 制約充足：workerのdeploy
   //
-  // dexieDB上のschemeをworkerに読み込んで類似度行列の計算を始める
-  //
+  // dexieDB上またはstaticQueryのschemeをworkerに読み込んで類似度行列の計算を始める
+  // エラーが起きなかった場合はuploadを要求する
 
   useEffect(() => {
     if (flags.deploy === 'req') {
@@ -396,10 +406,21 @@ export default function BiomebotProvider({ firestore, children }) {
             partWorkersRef.current.push(new PartWorker());
             let pw = partWorkersRef.current[partWorkersRef.current.length - 1];
             pw.onmessage = function (event) {
-              const type = event.data.type;
+              const action = event.data;
+              const result = action.result;
               // partLoaded, partNotFound, partDeployedをディスパッチ
-              dispatch({ type: type, numOfParts: numOfParts });
+              // ここでスクリプトがvalidateされ、エラーの有無をdexidDB上の
+              // データに記録する。エラーがある場合はschemeアップロードの制約充足で
+              // 必ずロードされる
 
+              if (result.status !== 'ok') {
+                state.channel.postMessage({ type: 'error', result: result });
+                db.noteSchemeValidation(botId, false);
+
+              } else {
+                dispatch({ type: action.type, numOfParts: numOfParts });
+                db.noteSchemeValidation(botId, true);
+              }
             }
 
             const cond = await getPersistentCondition(firestore, botId, pn);
@@ -455,7 +476,7 @@ export default function BiomebotProvider({ firestore, children }) {
       partWorkersRef.current.map(p => p.terminate());
     }
   },
-    [flags.deploy, flags.upload_scheme, auth.uid, chatbotsSnap, firestore]);
+    [flags.deploy, flags.upload_scheme, auth.uid, chatbotsSnap, firestore, state.channel]);
 
   //-------------------------------------------------------------
   // 制約充足：schemeの選択とアップロード
@@ -472,7 +493,9 @@ export default function BiomebotProvider({ firestore, children }) {
       const botId = auth.uid;
       let dir;
       (async () => {
-        if (!await isExistUserChatbot(firestore, auth.uid)) {
+        if (!await db.isSchemeValid(botId)) {
+          // validate済みでなかった場合は読み込み・更新する
+
           // ユーザインプットにチャットボットの名前が含まれていたらそれを採用。
           // なければランダムに選ぶ
           const botname2dir = getBotName2RelativeDir(chatbotsSnap);
@@ -503,16 +526,10 @@ export default function BiomebotProvider({ firestore, children }) {
 
           await uploadScheme(firestore, botId, data);
 
+
+          // dexieに書き込む
+          await db.saveScheme(botId, data);
         }
-        else {
-          // firestore上にあればそれを使用
-          data = await downloadScheme(firestore, botId);
-
-        }
-
-        // dexieに書き込む
-        await db.saveScheme(botId, data);
-
         dispatch({ type: 'flag', flags: { upload_scheme: 'done' } });
       })();
 

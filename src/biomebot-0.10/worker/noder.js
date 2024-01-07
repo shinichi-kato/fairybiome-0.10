@@ -155,7 +155,7 @@ export class Noder {
         continue
       } else 
       if(phase === 1){
-        console.error(seg)
+        // console.error(seg)
         let t = tagDict[seg];
         nodes.push(new Node(t.surf,t.feat))
         phase = 2;

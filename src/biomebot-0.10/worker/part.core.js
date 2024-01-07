@@ -27,8 +27,6 @@ const KIND_ENV = 4;
 const DEFAULT_TAG_WEIGHT = 2.0;
 const DEFAULT_TAILING = 0.2;
 
-const channel = new BroadcastChannel('biomebot');
-
 export const part = {
   partName: null,
 
@@ -44,14 +42,15 @@ export const part = {
   condVector: null,
   pendingCond: {},
   outScript: [],
+  channel: new BroadcastChannel('biomebot'),
 
   handleInput: (action) => {
     const retr = retrieve(action.message);
-    console.log(retr)
+    console.log("part input ",retr)
     if (retr.score > part.response.minIntensity) {
       const rndr = part.render(retr.index);
 
-      channel.postMessage({
+      part.channel.postMessage({
         type: 'innerOutput',
         partName: part.partName,
         text: rndr.text,
@@ -73,12 +72,15 @@ export const part = {
   load: async (botId, partName, validAvatars) => {
     const data = await db.loadPart(botId, partName);
     if (!data) {
-      return false;
+      return {
+        status: 'error',
+        messages: [`${partName}がロードできませんでした`]
+      }
     }
     part.partName = partName;
     part.script = [...data.script];
     part.validAvatars = [...validAvatars];
-    return true;
+    return {status: 'ok'};
   },
 
   deploy: () => {
@@ -87,25 +89,25 @@ export const part = {
     if (part.script.length === 0) {
       return {
         status: 'error',
-        message: 'スクリプトがロードされていません'
+        messages: ['スクリプトがロードされていません']
       }
     }
     // スクリプトから類似度測定用の行列を計算
     const pp = preprocess(part.script, part.validAvatars);
     if (pp.status !== 'ok') {
-      return pp;
+      return {partName: part.partName, ...pp};
     }
 
     // in,outの分割
     const t = tee(pp.script);
     if (t.status !== 'ok') {
-      return t;
+      return {partName: part.partName, ...t};
     }
 
     // inの行列生成
     const mt = matrixize(t.inScript, pp.params);
     if (mt.status !== 'ok') {
-      return mt;
+      return {partName: part.partName, ...mt};
     }
 
     // outをsqueeze
@@ -132,7 +134,34 @@ export const part = {
     part.condVector = multiply(ones(1, mt.condVocabLength), -1); //初期の条件ベクトル(すべて-1)
     part.pendingCond = {};
     part.ICITags = {};
+
+    console.log("part onmessage installing")
+
+    part.channel.onmessage = event =>{
+      console.log("part onmessage")
+      const action = event.data;
+      switch(action.type){
+        case 'input':
+          part.handleInput(action);
+          break;
+        
+        case 'output': {
+          part.handleOutput(action);
+          break;
+        }
+
+        case 'close': {
+          part.channel.close();
+          break;
+        }
+
+        default:
+          /* nop */
+      }
+    }
+
     return {
+      partName: part.partName,
       status: 'ok'
     }
   },
@@ -325,23 +354,5 @@ export const part = {
       part.condVector.set([0, pos], -part.condWeight);
     }
     part.pendingCond = {};
-  }
-};
-
-
-channel.onmessage = event => {
-  const action = event.data;
-  // const botId = action.botId;
-  switch (action.type) {
-    case 'input':
-      part.handleInput(action);
-      break;
-
-    case 'output':
-      part.handleOutput(action);
-      break;
-
-    default:
-    /* nop */
   }
 };

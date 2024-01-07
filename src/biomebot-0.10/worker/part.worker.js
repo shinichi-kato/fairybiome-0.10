@@ -3,22 +3,21 @@ part worker
 ==================================
 
 */
-import { part } from './part.core'
+import { part } from './part.core';
 
 onmessage = function (event) {
-  console.log("part onmessage", event)
   const action = event.data;
   const botId = action.botId;
   switch (action.type) {
     case 'deploy': {
       (async () => {
         let result = await part.load(botId, action.partName, action.validAvatars);
-        if (result) {
+        if (result.status === 'ok') {
           postMessage({ type: 'partLoaded', result: result });
           result = part.deploy();
           postMessage({ type: 'partDeployed', result: result });
         } else {
-          postMessage({ type: 'partNotFound' });
+          postMessage({ type: 'partNotFound' ,result: result});
         }
       })();
       break;

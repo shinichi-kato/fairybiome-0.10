@@ -45,6 +45,8 @@ class dbio {
     this.exists = this.exists.bind(this);
     this.saveScheme = this.saveScheme.bind(this);
     this.getPartNamesAndAvatarDir = this.getPartNamesAndAvatarDir.bind(this);
+    this.noteSchemeValidation = this.noteSchemeValidation.bind(this);
+    this.isSchemeValid = this.isSchemeValid.bind(this);
     this.loadScheme = this.loadScheme.bind(this);
     this.loadPart = this.loadPart.bind(this);
     this.savePart = this.savePart.bind(this);
@@ -88,17 +90,28 @@ class dbio {
       if (node === 'main') {
         await this.db.scheme.put({
           botId: botId, 
-          payload: payload[node]
+          payload: payload[node],
+          isValid: false,
         })
       }
       else {
         await this.db.parts.put({
           botId: botId, name: node,
-          payload: payload[node]
+          payload: payload[node],
         })
       }
     }
     return true;
+  }
+
+  async noteSchemeValidation(botId,isValid){
+    return await this.db.scheme.update(botId, {isValid: isValid});
+  }
+
+  async isSchemeValid(botId){
+    const data = await this.db.scheme.where({botId: botId}).first();
+
+    return data && data.isValid;
   }
 
   async loadPart(botId, partName) {
@@ -106,7 +119,6 @@ class dbio {
       botId: botId,
       name: partName
     }).first();
-    console.log(data)
     return data.payload;
   }
 

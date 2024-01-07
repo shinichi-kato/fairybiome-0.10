@@ -52,9 +52,20 @@ export const scheme = {
     scheme.displayName = scheme.memory["{BOT_NAME}"];
     scheme.channel.onmessage = event => {
       const action = event.data;
-      if (action.type === 'innerOutput') {
-        scheme.innerOutputs.push(action);
+      switch (action.type) {
+        case 'innerOutput':
+          scheme.innerOutputs.push(action);
+          break;
+        case 'close':
+          scheme.channel.close();
+          break;
+
+        default:
+          /* nop */
       }
+    }
+    scheme.channel.onmessageerror = event => {
+      console.log(event);
     }
     noder.load(scheme.memory);
 

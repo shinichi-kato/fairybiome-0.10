@@ -1,10 +1,6 @@
 {
-    "response": {
-        "minIntensity": 0.3,
-        "retention": 0.5
-    },
     "script": [
-        "with {!greeting}",
+        "with {?!greeting}",
         "avatar peace",
         "user こんにちは",
         "cheer 今日は！{+greeting}",

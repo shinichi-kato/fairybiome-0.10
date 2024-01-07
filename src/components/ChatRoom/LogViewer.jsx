@@ -108,6 +108,10 @@ function RightBalloon({ message }) {
 }
 
 function SystemMessage({ message }) {
+  let texts = message.text.split('\n');
+  texts = texts.map((text,index)=>
+    <Typography variant="body2" color="error.main" key={index}>{text}</Typography>
+    );
   return (
     <Box
       display="flex"
@@ -115,7 +119,11 @@ function SystemMessage({ message }) {
       alignItems="center"
     >
       <Box>
-        <Typography>{message.text}</Typography>
+        {
+          message.speakerName && 
+          <Typography variant="caption">{message.speakerName}</Typography>
+        }
+        {texts}
       </Box>
     </Box>
   )
