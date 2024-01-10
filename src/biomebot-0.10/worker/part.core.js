@@ -43,10 +43,10 @@ export const part = {
   pendingCond: {},
   outScript: [],
   channel: new BroadcastChannel('biomebot'),
-
+  
   handleInput: (action) => {
-    const retr = retrieve(action.message);
-    console.log("part input ",retr)
+    const retr = part.retrieve(action.message);
+    console.log("part input ", retr)
     if (retr.score > part.response.minIntensity) {
       const rndr = part.render(retr.index);
 
@@ -80,7 +80,32 @@ export const part = {
     part.partName = partName;
     part.script = [...data.script];
     part.validAvatars = [...validAvatars];
-    return {status: 'ok'};
+
+    part.channel.onmessage = event => {
+      const action = event.data;
+      console.log(part.partName,"broadcast channel recieved",action)
+      switch (action.type) {
+        case 'input':
+          part.handleInput(action);
+          break;
+
+        case 'output': {
+          part.handleOutput(action);
+          break;
+        }
+
+        case 'close': {
+          console.log("closing biomebot");
+          part.channel.close();
+          break;
+        }
+
+        default:
+        /* nop */
+      }
+    }
+
+    return { status: 'ok' };
   },
 
   deploy: () => {
@@ -95,19 +120,19 @@ export const part = {
     // スクリプトから類似度測定用の行列を計算
     const pp = preprocess(part.script, part.validAvatars);
     if (pp.status !== 'ok') {
-      return {partName: part.partName, ...pp};
+      return { partName: part.partName, ...pp };
     }
 
     // in,outの分割
     const t = tee(pp.script);
     if (t.status !== 'ok') {
-      return {partName: part.partName, ...t};
+      return { partName: part.partName, ...t };
     }
 
     // inの行列生成
     const mt = matrixize(t.inScript, pp.params);
     if (mt.status !== 'ok') {
-      return {partName: part.partName, ...mt};
+      return { partName: part.partName, ...mt };
     }
 
     // outをsqueeze
@@ -121,7 +146,7 @@ export const part = {
       minIntensity: params.minIntensity,
       retention: params.retention,
     },
-      part.wordVocabLength = mt.wordVocabLength;
+    part.wordVocabLength = mt.wordVocabLength;
     part.condVocabLength = mt.condVocabLength;
     part.wordVocab = mt.wordVocab;
     part.condVocab = mt.condVocab;
@@ -135,30 +160,8 @@ export const part = {
     part.pendingCond = {};
     part.ICITags = {};
 
-    console.log("part onmessage installing")
 
-    part.channel.onmessage = event =>{
-      console.log("part onmessage")
-      const action = event.data;
-      switch(action.type){
-        case 'input':
-          part.handleInput(action);
-          break;
-        
-        case 'output': {
-          part.handleOutput(action);
-          break;
-        }
-
-        case 'close': {
-          part.channel.close();
-          break;
-        }
-
-        default:
-          /* nop */
-      }
-    }
+    part.channel.postMessage({type:"test",partName:part.partName})
 
     return {
       partName: part.partName,
@@ -333,7 +336,7 @@ export const part = {
     // 直前のrenderが採用された
     // retentionチェックが成功したら{?ACTIVATED}を+に
     // CondVectorを更新
- 
+
     let pos = part.condVocab['ACTIVATED'];
     console.log(part.condVector)
     part.condVector.set([0, pos], part.condWeight);

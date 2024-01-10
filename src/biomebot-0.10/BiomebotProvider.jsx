@@ -44,13 +44,13 @@ unhappy       楽しくない      会話中の状態
 import React, {
   useReducer, createContext,
   useContext, useEffect,
-  useState, useRef
+  useState, useRef, useCallback
 } from 'react';
 import { useStaticQuery, graphql } from "gatsby";
 import { AuthContext } from '../components/Auth/AuthProvider';
 
 import {
-  uploadScheme, 
+  uploadScheme,
   getPersistentCondition, setPersistentCondition,
 } from '../fsio.js';
 import { db } from '../dbio.js';
@@ -116,6 +116,10 @@ function getValidBotAvatars(data, avatarDir) {
     }
   }
   return avatars;
+}
+
+function generateBotIdFromUserId(uid) {
+  return uid && `bot${uid}`;
 }
 
 const initialState = {
@@ -285,7 +289,7 @@ export default function BiomebotProvider({ firestore, children }) {
   const auth = useContext(AuthContext);
   const [state, dispatch] = useReducer(reducer, initialState);
   const [msgQueue, setMsgQueue] = useState([]);
-  const centralWorkerRef = useRef(new CentralWorker());
+  const centralWorkerRef = useRef();
   const partWorkersRef = useRef([]);
 
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
@@ -293,32 +297,41 @@ export default function BiomebotProvider({ firestore, children }) {
 
 
   useEffect(() => {
-    let cw;
-    if (centralWorkerRef.current === null) {
+    let cw, c, pws;
+    if (!centralWorkerRef.current) {
       centralWorkerRef.current = new CentralWorker();
       cw = centralWorkerRef.current;
+      c = new BroadcastChannel('biomebot');
+      dispatch({ type: 'setChannel', channel: c });
     }
-    console.log("open channel")
-    let c = new BroadcastChannel('biomebot');
-    dispatch({ type: 'setChannel', channel: c });
+
+    pws = partWorkersRef.current;
 
     return () => {
-      cw.kill();
-      cw.terminate();
-      cw = undefined;
-      console.log("close all channel")
-      c.postMessage({ type: 'close' });
+      if (cw && c) {
+        cw.postMessage({ type: 'kill' });
+        cw = undefined;
+        console.log("close all channel")
+        c.postMessage({ type: 'close' });
+      }
+      if (pws.length !== 0) {
+        for (let pw of pws) {
+          pw.terminate();
+        }
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (firestore && auth.uid && state.channel) {
+    const botId = generateBotIdFromUserId(auth.uid);
+    if (firestore && botId && state.channel) {
 
       state.channel.onmessage = event => {
         const action = event.data;
+        console.log("biomebot channel monitor:", action);
         switch (action.type) {
           case 'output':
-            setPersistentCondition(firestore, auth.uid, action.partName, action.cond);
+            setPersistentCondition(firestore, botId, action.partName, action.cond);
             break;
 
           case 'close':
@@ -339,7 +352,7 @@ export default function BiomebotProvider({ firestore, children }) {
   // chatbotがdeployされていたらメッセージをチャンネルにポストする
   // 
 
-  function postUserMessage(message) {
+  const postUserMessage = useCallback(message => {
     if (flags.deploy === 'done') {
       // workerが起動していればchannelにメッセージをポスト
       dispatch({ type: 'setNextInterval' });
@@ -352,7 +365,7 @@ export default function BiomebotProvider({ firestore, children }) {
       }
       setMsgQueue([message]);
     }
-  }
+  }, [flags.deploy, dispatch]);
 
   //-------------------------------------------
   // 制約充足：queueの消費
@@ -382,6 +395,7 @@ export default function BiomebotProvider({ firestore, children }) {
     centralWorkerRef.current.postMessage({ type: 'run' });
     dispatch({ type: 'setNextInterval' });
 
+
   }, state.interval.current);
 
   //-------------------------------------------
@@ -393,76 +407,78 @@ export default function BiomebotProvider({ firestore, children }) {
   useEffect(() => {
     if (flags.deploy === 'req') {
       if (flags.upload_scheme === 'done') {
-        const botId = auth.uid;
+        const botId = generateBotIdFromUserId(auth.uid);
 
         (async () => {
           const { partNames, avatarDir } = await db.getPartNamesAndAvatarDir(botId);
           // partのデプロイ
-          partWorkersRef.current = [];
 
-          const numOfParts = partNames.length;
-          const validBotAvatars = getValidBotAvatars(chatbotsSnap, avatarDir);
-          for (let pn of partNames) {
-            partWorkersRef.current.push(new PartWorker());
-            let pw = partWorkersRef.current[partWorkersRef.current.length - 1];
-            pw.onmessage = function (event) {
-              const action = event.data;
-              const result = action.result;
-              // partLoaded, partNotFound, partDeployedをディスパッチ
-              // ここでスクリプトがvalidateされ、エラーの有無をdexidDB上の
-              // データに記録する。エラーがある場合はschemeアップロードの制約充足で
-              // 必ずロードされる
+          if (partWorkersRef.current.length === 0) {
 
-              if (result.status !== 'ok') {
-                state.channel.postMessage({ type: 'error', result: result });
-                db.noteSchemeValidation(botId, false);
+            const numOfParts = partNames.length;
+            const validBotAvatars = getValidBotAvatars(chatbotsSnap, avatarDir);
 
-              } else {
-                dispatch({ type: action.type, numOfParts: numOfParts });
-                db.noteSchemeValidation(botId, true);
+            for (let pn of partNames) {
+              let pw = new PartWorker();
+
+              partWorkersRef.current.push(pw);
+              pw.onmessage = function (event) {
+                const action = event.data;
+                const result = action.result;
+                // partLoaded, partNotFound, partDeployedをディスパッチ
+                // ここでスクリプトがvalidateされ、エラーの有無をdexidDB上の
+                // データに記録する。エラーがある場合はschemeアップロードの制約充足で
+                // 必ずロードされる
+
+                if (result.status !== 'ok') {
+                  state.channel.postMessage({ type: 'error', result: result });
+                  db.noteSchemeValidation(botId, false);
+
+                } else {
+                  dispatch({ type: action.type, numOfParts: numOfParts });
+                  db.noteSchemeValidation(botId, true);
+                }
               }
+
+              const cond = await getPersistentCondition(firestore, botId, pn);
+              pw.postMessage({
+                type: 'deploy',
+                botId: botId,
+                partName: pn,
+                persistentCond: cond,
+                validAvatars: validBotAvatars
+              })
+
             }
 
-            const cond = await getPersistentCondition(firestore, botId, pn);
-            pw.postMessage({
+            // centralのデプロイ
+            console.log("deployScheme");
+
+            // centralWorkerRef.current = new CentralWorker();
+            let cw = centralWorkerRef.current;
+            cw.onmessage = function (event) {
+              console.log(event.data);
+              const type = event.data.type;
+              // centralLoaded, centralNotFound, centralDeployedをディスパッチ
+              switch (type) {
+                case 'centralDeployed': {
+                  dispatch({
+                    type: type,
+                    ...event.data,
+                    numOfParts: numOfParts
+                  });
+                  break;
+                }
+                default:
+                  dispatch({ type: type, numOfParts: numOfParts });
+
+              }
+            }
+            cw.postMessage({
               type: 'deploy',
-              botId: botId,
-              partName: pn,
-              persistentCond: cond,
-              validAvatars: validBotAvatars
-            })
+              botId: botId
+            });
           }
-
-
-          // centralのデプロイ
-          console.log("deployScheme");
-
-          // centralWorkerRef.current = new CentralWorker();
-          let cw = centralWorkerRef.current;
-          cw.onmessage = function (event) {
-            console.log(event.data);
-            const type = event.data.type;
-            // centralLoaded, centralNotFound, centralDeployedをディスパッチ
-            switch (type) {
-              case 'centralDeployed': {
-                dispatch({
-                  type: type,
-                  ...event.data,
-                  numOfParts: numOfParts
-                });
-                break;
-              }
-              default:
-                dispatch({ type: type, numOfParts: numOfParts });
-
-            }
-          }
-          cw.postMessage({
-            type: 'deploy',
-            botId: botId
-          });
-
-
         })();
 
       } else {
@@ -472,9 +488,14 @@ export default function BiomebotProvider({ firestore, children }) {
       }
 
     }
-    return () => {
-      partWorkersRef.current.map(p => p.terminate());
-    }
+
+    // ここでpartWorkerをterminateしてしまうと、依存行列の内容が変わった瞬間に
+    // terminateが実行されてしまう
+    // return () => {
+    //   if (pws) {
+    //     pws.map(p => p.terminate());
+    //   }
+    // }
   },
     [flags.deploy, flags.upload_scheme, auth.uid, chatbotsSnap, firestore, state.channel]);
 
@@ -490,7 +511,7 @@ export default function BiomebotProvider({ firestore, children }) {
     if (flags.upload_scheme === 'req') {
       console.log("upload_scheme");
       let data = {};
-      const botId = auth.uid;
+      const botId = generateBotIdFromUserId(auth.uid);
       let dir;
       (async () => {
         if (!await db.isSchemeValid(botId)) {

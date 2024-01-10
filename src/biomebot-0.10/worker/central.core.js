@@ -52,11 +52,13 @@ export const scheme = {
     scheme.displayName = scheme.memory["{BOT_NAME}"];
     scheme.channel.onmessage = event => {
       const action = event.data;
+      console.log("central broadcast channel recieved",action)
       switch (action.type) {
         case 'innerOutput':
           scheme.innerOutputs.push(action);
           break;
         case 'close':
+          console.log("closing biomebot channel")
           scheme.channel.close();
           break;
 

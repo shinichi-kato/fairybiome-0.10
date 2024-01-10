@@ -5,9 +5,10 @@ part worker
 */
 import { part } from './part.core';
 
-onmessage = function (event) {
+onmessage = (event) => {
   const action = event.data;
   const botId = action.botId;
+  console.log(part.partName,"onmessage",action);
   switch (action.type) {
     case 'deploy': {
       (async () => {
@@ -20,6 +21,11 @@ onmessage = function (event) {
           postMessage({ type: 'partNotFound' ,result: result});
         }
       })();
+      break;
+    }
+
+    case 'test': {
+      console.log(part.channel);
       break;
     }
 

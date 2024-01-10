@@ -5,7 +5,6 @@ import {scheme} from './central.core';
 onmessage = (event) => {
   const action = event.data;
   const botId = action.botId;
-  console.log(action);
   switch (action.type) {
     case 'deploy': {
       // dbからロードし、行列計算

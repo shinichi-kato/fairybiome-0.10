@@ -64,7 +64,7 @@ describe('part core', () => {
 
   it('load', async () => {
     const r = await part.load('test', 'testPart', validAvatars);
-    expect(r).toBe(true);
+    expect(r.status).toBe("ok");
   });
 
   it('deploy', () => {
