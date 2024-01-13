@@ -8,7 +8,6 @@ import { part } from './part.core';
 onmessage = (event) => {
   const action = event.data;
   const botId = action.botId;
-  console.log(part.partName,"onmessage",action);
   switch (action.type) {
     case 'deploy': {
       (async () => {

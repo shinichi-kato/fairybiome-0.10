@@ -72,11 +72,11 @@ export function matrixize(inScript, params) {
     vocabの生成
   */
 
-  const condVocabKeys = Object.keys(condVocab);
-  const wordVocabKeys = Object.keys(wordVocab);
+  let condVocabKeys = Object.keys(condVocab);
+  let wordVocabKeys = Object.keys(wordVocab);
 
   // 必須のcondVocabを追加
-  condVocabKeys.concat(SYSTEM_COND_TAGS);
+  condVocabKeys = [...SYSTEM_COND_TAGS,condVocabKeys];
 
   // condVocab,wordVocabともに1つしか要素がない場合
   // dot()計算が失敗するのでダミーを加える

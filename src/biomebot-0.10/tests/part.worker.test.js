@@ -4,6 +4,7 @@ import '@vitest/web-worker';
 import { part } from '../worker/part.core';
 import { expect, describe, it,not } from 'vitest';
 import { db } from '../../dbio.js';
+import {Message} from '../../message.js'
 
 const schemeData = {
   "description": "説明",
@@ -73,7 +74,8 @@ describe('part core', () => {
   });
 
   it('retrieve', ()=>{
-    const r = part.retrieve('お姉さんこんにちは');
+    const m= new Message('user',{text:"お姉さんこんにちは"})
+    const r = part.retrieve(m);
     expect(r.index).toBe(0)
   });
 

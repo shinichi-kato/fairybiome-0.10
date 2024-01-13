@@ -3,7 +3,7 @@
 // memory
 // {BOT_NAME} : チャットボットの名前
 // {BOT_NICKNAMES}: チャットボットのニックネーム配列
-// {BOT_ANSWER_REQUIRED}: ユーザがボットに話しかけた
+// {REQUEST_COUNT}: ユーザがボットに話しかけた
 // {CURRENT_COND_TAGS}:  
 
 import { db } from '../../dbio.js';
@@ -52,7 +52,6 @@ export const scheme = {
     scheme.displayName = scheme.memory["{BOT_NAME}"];
     scheme.channel.onmessage = event => {
       const action = event.data;
-      console.log("central broadcast channel recieved",action)
       switch (action.type) {
         case 'innerOutput':
           scheme.innerOutputs.push(action);
@@ -86,7 +85,7 @@ export const scheme = {
     //   score: retr.score,
     //   avatar: rndr.avatar,
     // }
-    console.log("run")
+    console.log("run",scheme.memory)
     if (scheme.innerOutputs.length !== 0) {
       // ↓一番スコアの高いものに差し替えること
       const reply = pickRandom(scheme.innerOutputs)
@@ -116,8 +115,8 @@ export const scheme = {
       });
 
       scheme.innerOutputs = [];
-    } else if ('{BOT_ANSER_REQUIRED' in scheme.memory) {
-      const req = scheme.memory['{BOT_ANSER_REQUIRED']
+    } else if ('{REQUEST_COUNT}' in scheme.memory) {
+      const req = scheme.memory['{REQUEST_COUNT}'];
       if (req === 1) {
         // ユーザやボットからなにか言われたが返答していない場合、
         // 無言だったことを内言する。内言しても応答できなかった
@@ -135,7 +134,7 @@ export const scheme = {
       }
     }
 
-    scheme.memory['{BOT_ANSWER_REQUIRED'] = null;
+    scheme.memory['{REQUEST_COUNT}']=null;
     return true;
 
   },
@@ -146,15 +145,18 @@ export const scheme = {
   },
 
   recieve: (message) => {
-    console.log("central.core recieved");
+    console.log("central.core recieved",message.kind);
 
     if (message.kind !== 'env') {
-      if ('{BOT_ANSWER_REQUIRED}' in scheme.memory) {
-        scheme.memory["{BOT_ANSWER_REQUIRED}"]++;
+      if ('{REQUEST_COUNT}' in scheme.memory) {
+        scheme.memory["{REQUEST_COUNT}"]++;
+        console.log("memory-add")
       } else {
-        scheme.memory["{BOT_ANSWER_REQUIRED}"] = 1;
+        scheme.memory["{REQUEST_COUNT}"] = 1;
+        console.log("memory_assign",scheme.memory)
       }
     }
+    console.log(scheme.memory);
     scheme.channel.postMessage({ type: 'input', message: message });
   }
 }

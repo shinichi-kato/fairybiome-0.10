@@ -328,7 +328,7 @@ export default function BiomebotProvider({ firestore, children }) {
 
       state.channel.onmessage = event => {
         const action = event.data;
-        console.log("biomebot channel monitor:", action);
+        // console.log("biomebot channel monitor:", action);
         switch (action.type) {
           case 'output':
             setPersistentCondition(firestore, botId, action.partName, action.cond);

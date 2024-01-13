@@ -39,7 +39,8 @@ export const part = {
   script: [],
   vocab: null,
   validAvatars: [],
-  condVector: null,
+  condVocab: null,
+  wordVocab: null,
   pendingCond: {},
   outScript: [],
   channel: new BroadcastChannel('biomebot'),
@@ -148,8 +149,8 @@ export const part = {
     },
     part.wordVocabLength = mt.wordVocabLength;
     part.condVocabLength = mt.condVocabLength;
-    part.wordVocab = mt.wordVocab;
-    part.condVocab = mt.condVocab;
+    part.wordVocab = {...mt.wordVocab};
+    part.condVocab = {...mt.condVocab};
     part.wordMatrix = mt.wordMatrix;
     part.condMatrix = mt.condMatrix;
     part.inDelayEffect = delayEffector(2, params.condWeight);
@@ -171,7 +172,7 @@ export const part = {
 
   retrieve: (message) => {
     /* 
-      入力文字列を受取り、スコアを返す
+      Message型の入力を受取り、スコアを返す
       wordVectorは正規化してwordMatrixとの内積。
       condVectorはそのままcondMatrixとの内積を計算してcondWeight倍する。
       両者を加えたものをscoreとする
@@ -180,11 +181,12 @@ export const part = {
     let tagDict = message.tagDict;
     let wv = zeros(1, part.wordVocabLength);
     let cv = zeros(1, part.condVocabLength);
-
     // messageにcondTagsが含まれていたらそれを考慮に入れる
     for (let tag in tagDict) {
-      const pos = part.condVocab[tag];
-      cv.set([0, pos], tagDict[tag] * part.condWeight);
+      if(tag in part.condVocab){
+        const pos = part.condVocab[tag];
+        cv.set([0, pos], tagDict[tag] * part.condWeight);
+      }
     }
 
 
@@ -213,7 +215,8 @@ export const part = {
     }
 
     // wvは正規化
-    const inv_wv = apply(wv, 1, x => divide(1, norm(x)));
+    // norm(x)が0の場合はzerosで何もしない
+    const inv_wv = apply(wv, 1, x => divide(1, norm(x)||1));
     wv = multiply(diag(inv_wv), wv);
 
     // 直前の入力内容の影響をtailingに応じて受けたwvを得る
@@ -226,6 +229,7 @@ export const part = {
     const wvdot = apply(part.wordMatrix, 1, x => dot(squeeze(x), wvd));
     const cvdot = apply(part.condMatrix, 1, x => dot(squeeze(x), cv));
     const scores = add(wvdot, cvdot).valueOf();
+    
     const maxScore = Math.max(...scores);
     const cands = [];
     let i, l;
@@ -235,6 +239,8 @@ export const part = {
       }
     }
 
+    // 直前の状態を記憶。
+    // condのうち永続化するものはdbに記憶する予定(未実装)
     part.prevCv = clone(cv);
     part.prevWv = clone(wv);
 

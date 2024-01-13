@@ -15,7 +15,7 @@ describe("noder", () => {
   });
 
   it(`run(${message.text}`, () => {
-    const result = noder.run(message);
+    const result = noder.run(message.text);
     console.log(result);
 
     expect(result[3].feat).toBe('{2}')
