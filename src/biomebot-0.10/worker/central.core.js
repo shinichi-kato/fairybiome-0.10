@@ -85,11 +85,10 @@ export const scheme = {
     //   score: retr.score,
     //   avatar: rndr.avatar,
     // }
-    console.log("run",scheme.memory)
+    console.log("run")
     if (scheme.innerOutputs.length !== 0) {
       // ↓一番スコアの高いものに差し替えること
       const reply = pickRandom(scheme.innerOutputs)
-      console.log(reply.text)
 
       const message = new Message('bot', {
         avatarDir: scheme.avatarDir,
@@ -145,18 +144,13 @@ export const scheme = {
   },
 
   recieve: (message) => {
-    console.log("central.core recieved",message.kind);
-
     if (message.kind !== 'env') {
       if ('{REQUEST_COUNT}' in scheme.memory) {
         scheme.memory["{REQUEST_COUNT}"]++;
-        console.log("memory-add")
       } else {
         scheme.memory["{REQUEST_COUNT}"] = 1;
-        console.log("memory_assign",scheme.memory)
       }
     }
-    console.log(scheme.memory);
     scheme.channel.postMessage({ type: 'input', message: message });
   }
 }

@@ -9,14 +9,20 @@ chatbots コレクション
 
 import { collection, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
 
-export async function isExistUserChatbot(firestore, uid) {
-  // ユーザのチャットボットがfirestore上にあるか確認。
-  const botRef = doc(firestore, 'chatbot', uid);
+export async function getCurrentSchemeDir(firestore, botId) {
+  // ユーザのチャットボットがfirestore上にあればそのbotDirを返し、
+  // なければfalseを返す。
+  const botRef = doc(firestore, 'chatbot', botId);
   const botSnap = await getDoc(botRef);
-  return botSnap.exists();
+
+  if (botSnap.exists()) {
+    const data = botSnap.data();
+    return data.dir;
+  }
+  return false;
 }
 
-export async function uploadScheme(firestore, botId, data) {
+export async function uploadScheme(firestore, botId, data, dir) {
   // json形式で取得したdataをfirestoreに書き込む
   const botRef = doc(firestore, 'chatbot', botId);
 
@@ -25,6 +31,7 @@ export async function uploadScheme(firestore, botId, data) {
       await setDoc(botRef, {
         ...data[fn],
         ownerId: botId,
+        dir: dir,
       })
     } else {
       const partsRef = collection(botRef, 'parts');
@@ -32,6 +39,8 @@ export async function uploadScheme(firestore, botId, data) {
     }
   }
 }
+
+
 
 export async function downloadScheme(firestore, uid) {
   // firestoreに格納されたschemeを読み込み、
@@ -44,6 +53,8 @@ export async function downloadScheme(firestore, uid) {
   const mainSnap = await getDoc(botRef);
   if (mainSnap.exists()) {
     main = mainSnap.data();
+  }else {
+    return false;
   }
 
   const partsRef = collection(botRef, "parts");
@@ -53,7 +64,7 @@ export async function downloadScheme(firestore, uid) {
   })
 
   console.log("downloadshceme", main);
-  return { payload: { main: main, ...parts } };
+  return { main: main, ...parts };
 }
 
 

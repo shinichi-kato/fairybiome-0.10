@@ -3,6 +3,7 @@
     "author": "system",
     "avatarDir": "fairy-girl",
     "backgroundColor": "#de53a1",
+    "timestamp": ["2024-01-13","22:13:00"],
     "interval": {
         "max":  5000,
         "min":  1200

@@ -50,7 +50,7 @@ import { useStaticQuery, graphql } from "gatsby";
 import { AuthContext } from '../components/Auth/AuthProvider';
 
 import {
-  uploadScheme,
+  uploadScheme, downloadScheme,
   getPersistentCondition, setPersistentCondition,
 } from '../fsio.js';
 import { db } from '../dbio.js';
@@ -120,6 +120,14 @@ function getValidBotAvatars(data, avatarDir) {
 
 function generateBotIdFromUserId(uid) {
   return uid && `bot${uid}`;
+}
+
+function newerTimestamp(a, b) {
+  // ["2022-12-11","22:33:00"]という形式で格納されたtimestampを
+  // 比較し、aのほうが新しい場合trueを返す
+  if(a && !b){ return true}
+  if(!a && b){ return false}
+  return a[0] > b[0] && a[1] > b[1];
 }
 
 const initialState = {
@@ -500,61 +508,92 @@ export default function BiomebotProvider({ firestore, children }) {
     [flags.deploy, flags.upload_scheme, auth.uid, chatbotsSnap, firestore, state.channel]);
 
   //-------------------------------------------------------------
-  // 制約充足：schemeの選択とアップロード
+  // 制約充足: schemeの選択とアップロード
   //
-  // firestore上にユーザのschemeがない場合、
-  // ユーザから受け取ったメッセージにチャットボットの名前が含まれていたら
-  // そのschmeとpart一式をfirestoreにアップロード。同じ内容をdexie上にもアップロード
-  // トークン辞書の最新版をdexieDB上にコピー
+  // snap(staticQuery)をソースとし、db(dexie)とfs(firestore)にコピーを作る。
+  // アプリ動作中の更新はdbに対して行い、アプリ起動時にdbとfsの同期を行う。
+  // 
+  // 1. db上にデータが存在しない場合ユーザ入力を踏まえてdirを一つ選ぶ。
+  // 2. db上にvalidなデータがなければsnapからdbにコピーを作る
+  //    deploy時にvalidateが行われる。 
+  // 3. db上のデータがvalidであればfsのデータとdbのデータを比べ、新しい方に
+  //    同期する  
 
   useEffect(() => {
     if (flags.upload_scheme === 'req') {
       console.log("upload_scheme");
-      let data = {};
+      let graphqlSnap = {};
       const botId = generateBotIdFromUserId(auth.uid);
-      let dir;
+      let botDir;
+
       (async () => {
-        if (!await db.isSchemeValid(botId)) {
-          // validate済みでなかった場合は読み込み・更新する
+        // step 1: db上にデータがあればそれを使い、なければdirを一つ選ぶ
+        botDir = await db.getDir(botId) || choose();
 
-          // ユーザインプットにチャットボットの名前が含まれていたらそれを採用。
-          // なければランダムに選ぶ
-          const botname2dir = getBotName2RelativeDir(chatbotsSnap);
-          if (msgQueue.length !== 0) {
-            for (let botname in botname2dir) {
-              if (msgQueue[0].contains(botname)) {
-                dir = botname2dir[botname];
-                break
-              }
-            }
+        // schemeとpartをsnapから復元
 
+        for (let node of chatbotsSnap.allJson.nodes) {
+          if (node.parent.relativeDirectory === botDir) {
+            graphqlSnap[node.parent.name] = JSON.parse(node.parent.internal.content)
           }
-          if (!dir) {
-            const names = Object.keys(botname2dir)
-            const index = randomInt(names.length);
-            dir = botname2dir[names[index]];
-          }
-
-          // すべてのschemeをsnapから復元
-
-          for (let node of chatbotsSnap.allJson.nodes) {
-            if (node.parent.relativeDirectory === dir) {
-              data[node.parent.name] = JSON.parse(node.parent.internal.content)
-            }
-          }
-
-          // firestoreに上書き
-
-          await uploadScheme(firestore, botId, data);
-
-
-          // dexieに書き込む
-          await db.saveScheme(botId, data);
         }
+
+        // step 2: validなデータがなければsnapからdbにコピー
+        if (!await db.isSchemeValid(botId)) {
+          await db.saveScheme(botId, botDir, graphqlSnap);
+        }
+        else {
+          let fsSnap = await downloadScheme(firestore, botId);
+
+          let dbSnap = await db.loadScheme(botId);
+          console.log("fssnap",fsSnap);
+          console.log("dbSnap",dbSnap);
+          // step3: dbがvalidだった場合、schemeと各partについてそれぞれdb,fsの内容を
+          // gq,db,fsの中で最新のものに同期
+          for (let sn in graphqlSnap) {
+            let dbTs = dbSnap[sn].payload.timestamp;
+            let fsTs = fsSnap && fsSnap[sn].timestamp;
+            let gqTs = graphqlSnap[sn].timestamp;
+            console.log("timestamp",sn,dbTs,fsTs,gqTs)
+
+            if (newerTimestamp(gqTs, fsTs) && newerTimestamp(gqTs, dbTs)) {
+              // gqが最新の場合、graphqlSnapをdbに書き込む
+              await db.saveScheme(botId, botDir, graphqlSnap)
+            }
+
+            else if (newerTimestamp(dbTs, gqTs) && newerTimestamp(dbTs, fsTs)) {
+              // dbが最新の場合、dbSnapをfsに書き込む
+              await uploadScheme(firestore, botId, dbSnap, botDir);
+            }
+
+            else if (newerTimestamp(fsTs, dbTs) && newerTimestamp(fsTs, gqTs)) {
+              // fsが最新の場合、fsSnapをdbに書き込む
+              await db.saveScheme(botId, botDir, fsSnap)
+            }
+          }
+        }
+
         dispatch({ type: 'flag', flags: { upload_scheme: 'done' } });
       })();
 
+
+
       // 永続フラグの読み込みは未実装
+
+      function choose() {
+        const botname2dir = getBotName2RelativeDir(chatbotsSnap);
+        if (msgQueue.length !== 0) {
+          for (let botname in botname2dir) {
+            if (msgQueue[0].contains(botname)) {
+              return botname2dir[botname];
+            }
+          }
+
+        }
+        const names = Object.keys(botname2dir)
+        const index = randomInt(names.length);
+        return botname2dir[names[index]];
+      }
 
 
     }

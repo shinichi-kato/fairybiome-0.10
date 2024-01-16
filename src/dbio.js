@@ -42,7 +42,7 @@ class dbio {
       memory: "[botId+name]"
     })
 
-    this.exists = this.exists.bind(this);
+    this.getDir = this.getDir.bind(this);
     this.saveScheme = this.saveScheme.bind(this);
     this.getPartNamesAndAvatarDir = this.getPartNamesAndAvatarDir.bind(this);
     this.noteSchemeValidation = this.noteSchemeValidation.bind(this);
@@ -54,15 +54,30 @@ class dbio {
   }
 
 
-  async exists(botId) {
+  async getDir(botId) {
     //-------------------------------------------------------------
     // botIdで指定されたschemeと少なくとも１つの
-    // partが存在する場合trueを返す
+    // partが存在する場合dirを返す
 
     const s = await this.db.scheme.where({ botId: botId }).first();
     const p = await this.db.parts.where({ botId: botId }).first();
 
+    if(!!s && !!p){
+      return s.payload.dir
+    }
     return !!s & !!p
+  }
+
+  async getTimestamp(botId,schemeName){
+    // schemeNameが'main'の場合scheme、その他の場合partのtimestampを返す
+    if(schemeName==='main'){
+      const d = await this.db.scheme.where({ botId: botId }).first();
+      return d.payload.timestamp;
+    }else {
+      const d = await this.db.parts.where({ botId: botId }).first();
+      return d.payload.timestamp;
+    }
+
   }
 
   async getPartNamesAndAvatarDir(botId) {
@@ -79,24 +94,60 @@ class dbio {
   }
 
   async loadScheme(botId) {
-    const data = await this.db.scheme.where({ botId: botId }).first();
-    return data.payload;
+    /* botIdで指定されたschmemとpartsを読み込み
+       {
+          main:{ 
+            payload:payload,
+            dir:dir,
+            isValid:isValid
+          }
+          [partName]: 
+            {payload:payload}
+          , ...
+        } 
+       という形式のデータとして返す
+    */
+    const main = await this.db.scheme.where({ botId: botId }).first();
+    let parts = await this.db.parts.where(['botId', 'name'])
+    .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
+    .toArray();
+
+    if(!!main && !!parts){
+      let partDict = {};
+      for(let part of parts){
+        partDict[part.name] = {payload:part.payload}
+      }
+  
+      return { 
+        'main': main,
+        ...partDict
+      };
+  
+    }
+    return false;
   }
 
-  async saveScheme(botId, data) {
+  async saveScheme(botId, dir, data) {
+    /* data = { main: { payload:payload }, [partName]: {payload:payload} }
+       という形式のデータを受取り一括でdbに書き込む。
+       payloadはjsonファイルの内容。
+    */ 
+
     let payload = 'payload' in data ? data.payload : data;
 
     for (let node in payload) {
       if (node === 'main') {
         await this.db.scheme.put({
           botId: botId, 
+          dir: dir,
           payload: payload[node],
           isValid: false,
         })
       }
       else {
         await this.db.parts.put({
-          botId: botId, name: node,
+          botId: botId, 
+          name: node,
           payload: payload[node],
         })
       }

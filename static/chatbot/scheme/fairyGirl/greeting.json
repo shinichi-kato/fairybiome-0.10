@@ -1,4 +1,5 @@
 {
+    "timestamp": ["2024-01-13","22:13:00"],
     "script": [
         "with {?!greeting}",
         "avatar peace",
