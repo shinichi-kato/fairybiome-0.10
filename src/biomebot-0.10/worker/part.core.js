@@ -84,7 +84,6 @@ export const part = {
 
     part.channel.onmessage = event => {
       const action = event.data;
-      console.log(part.partName,"broadcast channel recieved",action)
       switch (action.type) {
         case 'input':
           part.handleInput(action);
@@ -358,7 +357,7 @@ export const part = {
   inertial: () => {
     // 直前のrenderが不採用だった
     // ・condPendingの削除
-    if (part.retention > random()) {
+    if (part.retention > Math.random()) {
       let pos = part.condVocab['ACTIVATED'];
       part.condVector.set([0, pos], -part.condWeight);
     }

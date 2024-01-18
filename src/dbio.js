@@ -50,6 +50,7 @@ class dbio {
     this.loadScheme = this.loadScheme.bind(this);
     this.loadPart = this.loadPart.bind(this);
     this.savePart = this.savePart.bind(this);
+    this.setPersistentCondition = this.setPersistentCondition.bind(this);
 
   }
 
@@ -193,6 +194,21 @@ class dbio {
     await this.db.memory.where({ botId: botId }).delete();
   }
 
+  async setPersistentCondition(botId, partName, conditions){
+    await this.db.flags.put({
+      botId: botId,
+      name: partName,
+      conditions: conditions
+    });
+  }
+
+  async getPersistentCondition(botId, partName){
+    const data = await this.db.memory.where({
+      botId: botId,
+      name: partName
+    }).first();
+    return (data && data.conditions) || {};
+  }
 
 }
 

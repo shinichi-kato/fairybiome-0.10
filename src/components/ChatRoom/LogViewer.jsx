@@ -33,10 +33,9 @@ function LeftBalloon({ message, uid }) {
     <Box
       display="flex"
       flexDirection="row"
-      alignSelf="flex-start"
       sx={{
         borderRadius: "15px 15px 15px 0px",
-        alignSelf: "flex-end",
+        alignSelf: "flex-start",
         padding: "0.5em",
         marginLeft: "2px",
         marginBottom: "2px",

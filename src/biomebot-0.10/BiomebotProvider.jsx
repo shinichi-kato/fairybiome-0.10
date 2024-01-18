@@ -51,7 +51,6 @@ import { AuthContext } from '../components/Auth/AuthProvider';
 
 import {
   uploadScheme, downloadScheme,
-  getPersistentCondition, setPersistentCondition,
 } from '../fsio.js';
 import { db } from '../dbio.js';
 import { randomInt, random } from 'mathjs';
@@ -339,7 +338,7 @@ export default function BiomebotProvider({ firestore, children }) {
         // console.log("biomebot channel monitor:", action);
         switch (action.type) {
           case 'output':
-            setPersistentCondition(firestore, botId, action.partName, action.cond);
+            db.setPersistentCondition(botId, action.partName, action.cond);
             break;
 
           case 'close':
@@ -448,7 +447,7 @@ export default function BiomebotProvider({ firestore, children }) {
                 }
               }
 
-              const cond = await getPersistentCondition(firestore, botId, pn);
+              const cond = await db.getPersistentCondition(botId, pn);
               pw.postMessage({
                 type: 'deploy',
                 botId: botId,

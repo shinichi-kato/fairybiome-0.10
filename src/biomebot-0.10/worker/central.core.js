@@ -35,20 +35,23 @@ export const scheme = {
   channel: new BroadcastChannel("biomebot"),
 
   load: async (botId) => {
-    const data = await db.loadScheme(botId);
+    let data = await db.loadScheme(botId);
     if (!data) {
       return false;
     }
-    scheme.schemeName = data.schemeName;
+    data = data.main;
+    let payload = data.payload;
+    scheme.botId = botId;
+    scheme.schemeName = data.dir;
     scheme.ownerId = data.ownerId;
-    scheme.avatarDir = data.avatarDir;
-    scheme.backgroundColor = data.backgroundColor;
+    scheme.avatarDir = payload.avatarDir;
+    scheme.backgroundColor = payload.backgroundColor;
     scheme.interval = {
       ...scheme.interval,
-      ...data.interval,
+      ...payload.interval,
     };
-    scheme.response = { ...data.response };
-    scheme.memory = { ...data.memory };
+    scheme.response = { ...payload.response };
+    scheme.memory = { ...payload.memory };
     scheme.displayName = scheme.memory["{BOT_NAME}"];
     scheme.channel.onmessage = event => {
       const action = event.data;
@@ -85,9 +88,9 @@ export const scheme = {
     //   score: retr.score,
     //   avatar: rndr.avatar,
     // }
-    console.log("run")
+    console.log("run",scheme)
     if (scheme.innerOutputs.length !== 0) {
-      // ↓一番スコアの高いものに差し替えること
+      // ↓そこそこスコアの高かったものからランダムに選ぶ
       const reply = pickRandom(scheme.innerOutputs)
 
       const message = new Message('bot', {
