@@ -31,6 +31,7 @@
 */
 
 import Dexie from "dexie";
+import { matrix } from "mathjs";
 
 class dbio {
   constructor() {
@@ -63,18 +64,18 @@ class dbio {
     const s = await this.db.scheme.where({ botId: botId }).first();
     const p = await this.db.parts.where({ botId: botId }).first();
 
-    if(!!s && !!p){
+    if (!!s && !!p) {
       return s.payload.dir
     }
     return !!s & !!p
   }
 
-  async getTimestamp(botId,schemeName){
+  async getTimestamp(botId, schemeName) {
     // schemeNameが'main'の場合scheme、その他の場合partのtimestampを返す
-    if(schemeName==='main'){
+    if (schemeName === 'main') {
       const d = await this.db.scheme.where({ botId: botId }).first();
       return d.payload.timestamp;
-    }else {
+    } else {
       const d = await this.db.parts.where({ botId: botId }).first();
       return d.payload.timestamp;
     }
@@ -110,20 +111,20 @@ class dbio {
     */
     const main = await this.db.scheme.where({ botId: botId }).first();
     let parts = await this.db.parts.where(['botId', 'name'])
-    .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
-    .toArray();
+      .between([botId, Dexie.minKey], [botId, Dexie.maxKey])
+      .toArray();
 
-    if(!!main && !!parts){
+    if (!!main && !!parts) {
       let partDict = {};
-      for(let part of parts){
-        partDict[part.name] = {payload:part.payload}
+      for (let part of parts) {
+        partDict[part.name] = { payload: part.payload }
       }
-  
-      return { 
+
+      return {
         'main': main,
         ...partDict
       };
-  
+
     }
     return false;
   }
@@ -132,14 +133,14 @@ class dbio {
     /* data = { main: { payload:payload }, [partName]: {payload:payload} }
        という形式のデータを受取り一括でdbに書き込む。
        payloadはjsonファイルの内容。
-    */ 
+    */
 
     let payload = 'payload' in data ? data.payload : data;
 
     for (let node in payload) {
       if (node === 'main') {
         await this.db.scheme.put({
-          botId: botId, 
+          botId: botId,
           dir: dir,
           payload: payload[node],
           isValid: false,
@@ -147,7 +148,7 @@ class dbio {
       }
       else {
         await this.db.parts.put({
-          botId: botId, 
+          botId: botId,
           name: node,
           payload: payload[node],
         })
@@ -156,12 +157,12 @@ class dbio {
     return true;
   }
 
-  async noteSchemeValidation(botId,isValid){
-    return await this.db.scheme.update(botId, {isValid: isValid});
+  async noteSchemeValidation(botId, isValid) {
+    return await this.db.scheme.update(botId, { isValid: isValid });
   }
 
-  async isSchemeValid(botId){
-    const data = await this.db.scheme.where({botId: botId}).first();
+  async isSchemeValid(botId) {
+    const data = await this.db.scheme.where({ botId: botId }).first();
 
     return data && data.isValid;
   }
@@ -194,7 +195,7 @@ class dbio {
     await this.db.memory.where({ botId: botId }).delete();
   }
 
-  async setPersistentCondition(botId, partName, conditions){
+  async setPersistentCondition(botId, partName, conditions) {
     await this.db.flags.put({
       botId: botId,
       name: partName,
@@ -202,12 +203,35 @@ class dbio {
     });
   }
 
-  async getPersistentCondition(botId, partName){
+  async getPersistentCondition(botId, partName) {
     const data = await this.db.memory.where({
       botId: botId,
       name: partName
     }).first();
     return (data && data.conditions) || {};
+  }
+
+  async loadConditionVector(botId, partName) {
+    const data = await this.db.memory.where({
+      botId: botId,
+      name: partName,
+    }).first();
+    return data && data.conditionVector && matrix([data.conditionVector]);
+  }
+
+  async saveConditionVector(botId, partName, condVector) {
+    /* update or insert into memory */
+    const ex = await this.db.memory.where({botId:botId, name:partName}).first();
+    const cv = condVector.toArray()[0];
+    if(ex){
+      await this.db.memory
+      .where({ botId: botId, name: partName })
+      .modify({ conditionVector: cv })
+    } else {
+      await this.db.memory
+      .put({botId: botId, name:partName, conditionVector: cv})
+    }
+    return true;
   }
 
 }

@@ -5,6 +5,7 @@ import { part } from '../worker/part.core';
 import { expect, describe, it,not } from 'vitest';
 import { db } from '../../dbio.js';
 import {Message} from '../../message.js'
+import {matrix,zeros,row} from 'mathjs';
 
 const schemeData = {
   "description": "説明",
@@ -54,7 +55,8 @@ let channel = new BroadcastChannel('biomebot');
 
 describe('part core', () => {
   it('scheme data prapration', async () => {
-    const r = await db.saveScheme('test', schemeData);
+    const d = {main:{payload:schemeData}};
+    const r = await db.saveScheme('test', 'dir', d);
     expect(r).toBe(true);
   });
 
@@ -89,6 +91,21 @@ describe('part core', () => {
     const r = part.activate();
     expect(r).toBe(true);
   });
+
+  it('saveConditionVector', async ()=>{
+    const cv = zeros(1,10);
+    cv.set([0,3],-1);
+    console.log("row",cv.toArray()[0])
+    const r = await db.saveConditionVector("test","testPart",cv);
+    expect(r).toBe(true);
+  });
+
+  it('loadConditionVector', async ()=>{
+    const r = await db.loadConditionVector("test","testPart");
+    const a = r.toArray()[0];
+    console.log(a)
+    expect(a[3]).toBe(-1);
+  })
 
   // let worker = new PartWorker();
   // worker.postMessage({ type: 'deploy', partName: 'test' });

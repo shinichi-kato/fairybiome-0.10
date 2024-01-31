@@ -147,9 +147,18 @@ const initialState = {
 }
 
 function reducer(state, action) {
-  console.log(`biomebotProvider - ${action.type}`);
+  // console.log(`biomebotProvider - ${action.type}`);
 
   switch (action.type) {
+    case 'output': {
+      const m = action.message;
+      return {
+        ...state,
+        botState: m.avatar,
+        avatarDir: m.avatarDir,
+      }
+    }
+
     case 'setChannel': {
       return {
         ...state,
@@ -338,6 +347,7 @@ export default function BiomebotProvider({ firestore, children }) {
         // console.log("biomebot channel monitor:", action);
         switch (action.type) {
           case 'output':
+            dispatch(action); // message, partName, cond
             db.setPersistentCondition(botId, action.partName, action.cond);
             break;
 

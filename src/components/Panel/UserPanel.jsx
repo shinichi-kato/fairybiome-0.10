@@ -3,7 +3,7 @@ import { withPrefix } from 'gatsby';
 import Box from '@mui/material/Box';
 
 
-export default function UserPanel({user, panelWidth}) {
+export default function UserPanel({ user, panelWidth }) {
   /*
   user:{
     displayName,
@@ -12,7 +12,7 @@ export default function UserPanel({user, panelWidth}) {
   
   */
   const width = panelWidth;
-  const height = width * 4/3;
+  const height = width * 4 / 3;
   const photoURL = `/user/avatar/${user.avatarDir}/peace.svg`;
 
   return (
@@ -27,17 +27,18 @@ export default function UserPanel({user, panelWidth}) {
           width: width,
           height: width,
           borderRadius: "100% 0% 0% 100% / 100% 100% 0% 0%",
-          backgroundColor: `${user.backgroundColor}`
+          backgroundColor: user.backgroundColor
         }}
         position="absolute"
         bottom={0}
         right={0}
       />
-      <Box sx={{
-        width: width,
-        height: height,
-        p:0, m:0
-      }}
+      <Box
+        sx={{
+          width: width,
+          height: height,
+          p: 0, m: 0
+        }}
         position="absolute"
         bottom={0}
         right={0}

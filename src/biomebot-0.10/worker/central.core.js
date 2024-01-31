@@ -88,7 +88,7 @@ export const scheme = {
     //   score: retr.score,
     //   avatar: rndr.avatar,
     // }
-    console.log("run",scheme)
+    console.log("run")
     if (scheme.innerOutputs.length !== 0) {
       // ↓そこそこスコアの高かったものからランダムに選ぶ
       const reply = pickRandom(scheme.innerOutputs)

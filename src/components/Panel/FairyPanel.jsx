@@ -13,7 +13,7 @@ export default function FairyPanel({ state, panelWidth }) {
   */
 
 
-  const width = 180;
+  const width = 192;
   const height = width * 4 / 3;
 
 
@@ -22,8 +22,8 @@ export default function FairyPanel({ state, panelWidth }) {
       sx={{
         width: width,
         height: height,
-        position: "relative"
       }}
+      position="relative"
     >
       <Box
         sx={{
@@ -31,29 +31,30 @@ export default function FairyPanel({ state, panelWidth }) {
           height: width,
           borderRadius: "0% 100% 100% 0% / 100% 100% 0% 0%",
           backgroundColor: state.backgroundColor,
-          position: "absolute",
-          bottom: 0,
-          left: 0,
         }}
+        position="absolute"
+        bottom={0}
+        left={0}
       />
-        <Box
-          sx={{
+      <Box
+        sx={{
+          width: width,
+          height: height,
+          p:0, m:0
+        }}
+        position="absolute"
+        bottom={0}
+        left={0}
+      >
+        <img
+          style={{
             width: width,
             height: height,
           }}
-          position="absolute"
-          bottom={0}
-          left={0}
-        >
-          <img
-            style={{
-              width: width,
-              height: height,
-            }}
-            src={withPrefix(`/chatbot/avatar/${state.avatarDir}/${state.botState}.svg`)}
-            alt={state.botState}
-          />
-        </Box>
+          src={withPrefix(`/chatbot/avatar/${state.avatarDir}/${state.botState}.svg`)}
+          alt={state.botState}
+        />
+      </Box>
     </Box>
   )
 }

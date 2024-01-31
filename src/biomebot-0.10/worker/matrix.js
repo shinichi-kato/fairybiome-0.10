@@ -8,6 +8,7 @@ const RE_TAG_LINE = /^(\{[a-zA-Z_]+\}) (.+)$/;
 const RE_BLANK_LINE = /^#?[ 　]*$/;
 const RE_EXPAND_TAG = /^\{[a-zA-Z_][a-zA-Z0-9_]*\}/;
 const RE_COND_TAG = /^\{(\?!?)([a-zA-Z_][a-zA-Z0-9_]*)\}$/;
+const RE_PERSISTENT_COND_TAG = /^\{(\?!?)([a-z_]+[A-Z0-9_][a-z0-9_]+[A-Za-z0-9_]*)\}$/; // lowerCamelCase
 
 const KIND_USER = 1;
 const KIND_BOT = 2;
@@ -158,6 +159,17 @@ export function matrixize(inScript, params) {
     wordMatrix: wv,
     condMatrix: cv,
   }
+}
+
+export function getPersistentMask(condVocab,condVocabLength){
+  let v = zeros(1,condVocabLength);
+  for (let index in condVocab){
+    let val = condVocab[index];
+    if(RE_PERSISTENT_COND_TAG.test(val)){
+      v.set([0,index], 1)
+    } 
+  }
+  return v;
 }
 
 export function tee(script) {

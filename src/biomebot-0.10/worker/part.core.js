@@ -2,16 +2,28 @@
 part worker
 ==================================
 
+■condition tag　以下これから実装
+partで使用する条件タグにはSYSTEM、Persistent、volatileがある。
+Persistentタグは頭文字が大文字で小文字も含み、dbに保持される。
+volatileタグは頭文字が小文字でdbに保持しない。
+その制御はマスク用のVectorを用い、PersistentCondMaskと呼ぶ。
+persistentCondMaskはcondVocabのPersistentなCondが1、ほかが0
+となっているvectorで、condVectorと要素ごとの掛け算をすることで
+dbに保存する際persistentCondでない要素はすべてゼロになる
+
 */
 
 import { db } from '../../dbio.js';
 import {
   zeros, ones, divide, apply, concat, dot, row, add,
-  diag, multiply, norm, randomInt, max, clone, squeeze,
-  identity, index, range, subset, size
+  diag, multiply, norm, randomInt, clone, squeeze,
+  dotmultiply
 } from "mathjs";
 import { noder } from './noder';
-import { matrixize, tee, preprocess, delayEffector, expand } from './matrix.js';
+import {
+  matrixize, tee, preprocess, delayEffector,
+  getPersistentMask
+} from './matrix.js';
 
 const RE_OUTSCRIPT = /^([^ ]+) (.+)$/;
 const RE_EXPAND_TAG = /^\{([a-zA-Z_][a-zA-Z0-9_]*)\}/;
@@ -29,6 +41,7 @@ const DEFAULT_TAILING = 0.2;
 
 export const part = {
   partName: null,
+  botId: null,
 
   // .jsonの保持
   response: {
@@ -40,13 +53,14 @@ export const part = {
   vocab: null,
   validAvatars: [],
   condVocab: null,
+  persistentCondMask: null,
   wordVocab: null,
   pendingCond: {},
   outScript: [],
   channel: new BroadcastChannel('biomebot'),
-  
-  handleInput: (action) => {
-    const retr = part.retrieve(action.message);
+
+  handleInput: async (action) => {
+    const retr = await part.retrieve(action.message);
     console.log("part input ", retr)
     if (retr.score > part.response.minIntensity) {
       const rndr = part.render(retr.index);
@@ -78,6 +92,7 @@ export const part = {
         messages: [`${partName}がロードできませんでした`]
       }
     }
+    part.botId = botId;
     part.partName = partName;
     part.script = [...data.script];
     part.validAvatars = [...validAvatars];
@@ -86,7 +101,7 @@ export const part = {
       const action = event.data;
       switch (action.type) {
         case 'input':
-          part.handleInput(action);
+          part.handleInput(action).then();
           break;
 
         case 'output': {
@@ -146,10 +161,10 @@ export const part = {
       minIntensity: params.minIntensity,
       retention: params.retention,
     },
-    part.wordVocabLength = mt.wordVocabLength;
+      part.wordVocabLength = mt.wordVocabLength;
     part.condVocabLength = mt.condVocabLength;
-    part.wordVocab = {...mt.wordVocab};
-    part.condVocab = {...mt.condVocab};
+    part.wordVocab = { ...mt.wordVocab };
+    part.condVocab = { ...mt.condVocab };
     part.wordMatrix = mt.wordMatrix;
     part.condMatrix = mt.condMatrix;
     part.inDelayEffect = delayEffector(2, params.condWeight);
@@ -157,11 +172,16 @@ export const part = {
     part.prevWv = zeros(1, mt.wordVocabLength); // 直前の入力
     part.prevCv = zeros(1, mt.condVocabLength); // 直前の入力
     part.condVector = multiply(ones(1, mt.condVocabLength), -1); //初期の条件ベクトル(すべて-1)
+    part.persistentCondMask = getPersistentMask(part.condVocab, condVocabLength);
+
+    db.saveConditionVector(part.botId, part.partName,
+      dotmultiply(part.condVector * part.persistentCondMask)); // deploy時に初期化
+
     part.pendingCond = {};
     part.ICITags = {};
 
+    part.channel.postMessage({ type: "test", partName: part.partName })
 
-    part.channel.postMessage({type:"test",partName:part.partName})
 
     return {
       partName: part.partName,
@@ -169,20 +189,25 @@ export const part = {
     }
   },
 
-  retrieve: (message) => {
+  retrieve: async (message) => {
     /* 
       Message型の入力を受取り、スコアを返す
       wordVectorは正規化してwordMatrixとの内積。
-      condVectorはそのままcondMatrixとの内積を計算してcondWeight倍する。
+      condVectorは直前の状態そのままcondMatrixとの内積を計算してcondWeight倍する。
       両者を加えたものをscoreとする
     */
     let text = message.text;
     let tagDict = message.tagDict;
     let wv = zeros(1, part.wordVocabLength);
-    let cv = zeros(1, part.condVocabLength);
+    let cv;
+
+    cv = clone(part.condVector);
+    // cv= await db.loadConditionVector(part.botId, part.partName)
+    //   || zeros(1, part.condVocabLength);
+
     // messageにcondTagsが含まれていたらそれを考慮に入れる
     for (let tag in tagDict) {
-      if(tag in part.condVocab){
+      if (tag in part.condVocab) {
         const pos = part.condVocab[tag];
         cv.set([0, pos], tagDict[tag] * part.condWeight);
       }
@@ -215,7 +240,7 @@ export const part = {
 
     // wvは正規化
     // norm(x)が0の場合はzerosで何もしない
-    const inv_wv = apply(wv, 1, x => divide(1, norm(x)||1));
+    const inv_wv = apply(wv, 1, x => divide(1, norm(x) || 1));
     wv = multiply(diag(inv_wv), wv);
 
     // 直前の入力内容の影響をtailingに応じて受けたwvを得る
@@ -228,7 +253,7 @@ export const part = {
     const wvdot = apply(part.wordMatrix, 1, x => dot(squeeze(x), wvd));
     const cvdot = apply(part.condMatrix, 1, x => dot(squeeze(x), cv));
     const scores = add(wvdot, cvdot).valueOf();
-    
+
     const maxScore = Math.max(...scores);
     const cands = [];
     let i, l;
@@ -350,6 +375,7 @@ export const part = {
       pos = part.condVocab[key];
       part.condVector.set([0, pos], part.condWeight * part.pendingCond[key]);
     }
+    db.saveConditionVector(part.botId, part.partName, part.condVector);
     part.pendingCond = {};
     return true;
   },
@@ -361,6 +387,7 @@ export const part = {
       let pos = part.condVocab['ACTIVATED'];
       part.condVector.set([0, pos], -part.condWeight);
     }
+    db.saveConditionVector(part.botId, part.partName, part.condVector);
     part.pendingCond = {};
   }
 };

@@ -13,10 +13,10 @@ function getPalletteDict(log, bgAlpha) {
   const dict = {};
   for (let m of log) {
     const sid = m.speakerId;
-    if(sid){
+    if (sid) {
       const bgColor = m.backgroundColor;
       dict[`balloon_${sid}`] = { main: alpha(bgColor, bgAlpha) };
-      dict[`avatar_${sid}`] = {main: bgColor}
+      dict[`avatar_${sid}`] = { main: bgColor }
     }
   }
   return dict;
@@ -43,12 +43,11 @@ function LeftBalloon({ message, uid }) {
       }}
     >
       <Box
-        alignS
       >
         <Avatar
           alt={message.speakerName}
           src={avatarPath}
-          sx={{bgcolor: `avatar_${sid}.main`}}
+          sx={{ bgcolor: `avatar_${sid}.main` }}
         />
       </Box>
       <Box
@@ -99,7 +98,7 @@ function RightBalloon({ message }) {
         <Avatar
           alt={message.speakerName}
           src={avatarPath}
-          sx={{bgcolor: `avatar_${sid}.main`}}
+          sx={{ bgcolor: `avatar_${sid}.main` }}
         />
       </Box>
     </Box>
@@ -108,9 +107,9 @@ function RightBalloon({ message }) {
 
 function SystemMessage({ message }) {
   let texts = message.text.split('\n');
-  texts = texts.map((text,index)=>
+  texts = texts.map((text, index) =>
     <Typography variant="body2" color="error.main" key={index}>{text}</Typography>
-    );
+  );
   return (
     <Box
       display="flex"
@@ -119,7 +118,7 @@ function SystemMessage({ message }) {
     >
       <Box>
         {
-          message.speakerName && 
+          message.speakerName &&
           <Typography variant="caption">{message.speakerName}</Typography>
         }
         {texts}
