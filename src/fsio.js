@@ -9,6 +9,10 @@ chatbots コレクション
 
 import { collection, doc, setDoc, getDoc, getDocs } from "firebase/firestore";
 
+export function generateBotIdFromUserId(uid) {
+  return uid && `bot${uid}`;
+}
+
 export async function getCurrentSchemeDir(firestore, botId) {
   // ユーザのチャットボットがfirestore上にあればそのbotDirを返し、
   // なければfalseを返す。
@@ -63,7 +67,7 @@ export async function downloadScheme(firestore, uid) {
     parts[doc.id] = doc.data()
   })
 
-  console.log("downloadshceme", main);
+  console.log("downloadshceme");
   return { main: main, ...parts };
 }
 

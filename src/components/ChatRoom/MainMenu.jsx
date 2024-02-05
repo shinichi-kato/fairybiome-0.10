@@ -1,5 +1,5 @@
 import React from 'react';
-import { withPrefix } from 'gatsby';
+import { withPrefix,navigate } from 'gatsby';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 
@@ -7,6 +7,11 @@ import Button from '@mui/material/Button';
 export default function MainMenu({
   displayName, handleToUserRoom, handleReset
 }) {
+
+  function handleToEdit(){
+    navigate("/edit");
+  }
+
   return (
     <Box
       sx={{
@@ -15,7 +20,7 @@ export default function MainMenu({
       }}
     >
       <Box
-        sx={{alignSelf: 'center'}}
+        sx={{ alignSelf: 'center' }}
       >
         <img
           src={withPrefix('/images/fairydoor.svg')}
@@ -35,13 +40,20 @@ export default function MainMenu({
             {displayName}の部屋に入る
           </Button>
         </Box>
-        {}
+        { }
       </Box>
       <Box>
         <Button
           onClick={handleReset}
         >
           はじめからやり直す
+        </Button>
+      </Box>
+      <Box>
+        <Button
+          onClick={handleToEdit}
+        >
+          チャットボットの編集
         </Button>
       </Box>
       <Box>

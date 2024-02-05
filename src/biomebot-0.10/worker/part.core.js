@@ -17,7 +17,7 @@ import { db } from '../../dbio.js';
 import {
   zeros, ones, divide, apply, concat, dot, row, add,
   diag, multiply, norm, randomInt, clone, squeeze,
-  dotmultiply
+  dotMultiply
 } from "mathjs";
 import { noder } from './noder';
 import {
@@ -172,10 +172,10 @@ export const part = {
     part.prevWv = zeros(1, mt.wordVocabLength); // 直前の入力
     part.prevCv = zeros(1, mt.condVocabLength); // 直前の入力
     part.condVector = multiply(ones(1, mt.condVocabLength), -1); //初期の条件ベクトル(すべて-1)
-    part.persistentCondMask = getPersistentMask(part.condVocab, condVocabLength);
+    part.persistentCondMask = getPersistentMask(part.condVocab, mt.condVocabLength);
 
     db.saveConditionVector(part.botId, part.partName,
-      dotmultiply(part.condVector * part.persistentCondMask)); // deploy時に初期化
+      dotMultiply(part.condVector, part.persistentCondMask)); // deploy時に初期化
 
     part.pendingCond = {};
     part.ICITags = {};

@@ -3,7 +3,7 @@
     "author": "system",
     "avatarDir": "default",
     "backgroundColor": "#de53a1",
-    "timestamp": ["2024-01-01","00:0000"],
+    "timestamp": ["2024-01-01","00:00:00"],
     "interval": {
         "max":  5000,
         "min":  1200

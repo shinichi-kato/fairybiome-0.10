@@ -50,7 +50,7 @@ import { useStaticQuery, graphql } from "gatsby";
 import { AuthContext } from '../components/Auth/AuthProvider';
 
 import {
-  uploadScheme, downloadScheme,
+  uploadScheme, downloadScheme, generateBotIdFromUserId
 } from '../fsio.js';
 import { db } from '../dbio.js';
 import { randomInt, random } from 'mathjs';
@@ -117,9 +117,7 @@ function getValidBotAvatars(data, avatarDir) {
   return avatars;
 }
 
-function generateBotIdFromUserId(uid) {
-  return uid && `bot${uid}`;
-}
+
 
 function newerTimestamp(a, b) {
   // ["2022-12-11","22:33:00"]という形式で格納されたtimestampを
@@ -566,8 +564,9 @@ export default function BiomebotProvider({ firestore, children }) {
             console.log("timestamp",sn,dbTs,fsTs,gqTs)
 
             if (newerTimestamp(gqTs, fsTs) && newerTimestamp(gqTs, dbTs)) {
-              // gqが最新の場合、graphqlSnapをdbに書き込む
+              // gqが最新の場合、graphqlSnapをdbとfsに書き込む
               await db.saveScheme(botId, botDir, graphqlSnap)
+              await uploadScheme(firestore, botId, graphqlSnap, botDir);
             }
 
             else if (newerTimestamp(dbTs, gqTs) && newerTimestamp(dbTs, fsTs)) {
@@ -578,6 +577,11 @@ export default function BiomebotProvider({ firestore, children }) {
             else if (newerTimestamp(fsTs, dbTs) && newerTimestamp(fsTs, gqTs)) {
               // fsが最新の場合、fsSnapをdbに書き込む
               await db.saveScheme(botId, botDir, fsSnap)
+            }
+
+            else if (!fsTs){
+              // fsに書き込まれてない場合dbの内容をfsに書き込む
+              await uploadScheme(firestore, botId, dbSnap, botDir);
             }
           }
         }
