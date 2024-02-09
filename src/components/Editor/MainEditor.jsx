@@ -5,6 +5,9 @@ import Input from '@mui/material/Input';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 
+import AvatarSelector from './AvatarSelector';
+import ColorSelector from './ColorSelector';
+
 const chatbotsQuery = graphql`
 query {
   allFile(filter: {sourceInstanceName: {eq: "botAvatar"}, ext: {eq: ".svg"}}) {
@@ -109,6 +112,17 @@ function reducer(state, action) {
       }
     }
 
+    case 'changeMinIntensity': {
+      const v = parseFloat(action.value);
+      return {
+        ...state,
+        response: {
+          minIntensity: action.value
+        },
+        message: (v && 0 < v) ? null : "error:response.minInterval"
+      }
+    }
+
 
     default:
       throw new Error(`invalid action ${action.type}`);
@@ -130,7 +144,7 @@ export default function MainEditor({ scheme, botId }) {
       }
 
     }
-  }, [botId, scheme, scheme.timestamp, state.timestamp]);
+  }, [botId, state.botId, scheme, scheme.timestamp, state.timestamp]);
 
   return (
     <Grid container
@@ -143,10 +157,21 @@ export default function MainEditor({ scheme, botId }) {
       <Grid item xs={8}>
         {state.botId}
       </Grid>
-      <Grid item xs={12}>
-        チャットボットの概要
+      <Grid item xs={3}>
+        アバター
       </Grid>
-      <Grid item xs={12}>
+      <Grid item xs={8}>
+        <AvatarSelector
+          avatars={Object.keys(botAvatars)}
+          value={state.avatarDir}
+          handleChange={e => dispatch({ type: 'changeValue', key: 'avatarDir', value: e.target.value })}
+          bgColor={state.backgroundColor}
+        />
+      </Grid>
+      <Grid item xs={3}>
+        概要
+      </Grid>
+      <Grid item xs={8}>
         <Input
           placeholder="チャットボットの概要"
           value={state.description}
@@ -160,7 +185,7 @@ export default function MainEditor({ scheme, botId }) {
           }}
         />
       </Grid>
-      <Grid item xs={3}>
+      <Grid item xs={3} >
         作者
       </Grid>
       <Grid item xs={8}>
@@ -171,13 +196,17 @@ export default function MainEditor({ scheme, botId }) {
             backgroundColor: "#ffffff",
             p: 1
           }}
+          fullWidth
         />
       </Grid>
       <Grid item xs={3}>
         背景色
       </Grid>
-      <Grid item xs={12}>
-
+      <Grid item xs={8}>
+        <ColorSelector
+          value={state.backgroundColor}
+          handleChange={v => dispatch({ type: 'changeValue', key: 'backgroundColor', value: v })}
+        />
       </Grid>
       <Grid item xs={3}>
         更新日時
@@ -186,8 +215,12 @@ export default function MainEditor({ scheme, botId }) {
         {`${state.timestamp[0]} ${state.timestamp[1]}`}
       </Grid>
       <Grid item xs={12}>
-        返答のインターバル
-        <Typography variant="caption">チャットボットが返答するまでの時間は変動します</Typography>
+        <Typography>返答のインターバル</Typography>
+        <Typography variant="caption">
+          チャットボットはある周期で返答を返します。
+          周期が短いと思いついたことを色々しゃべるように、周期が長いと考えてしゃべるように振る舞います。
+          この周期は下記の最短値、最小値の間でランダムに変動します。
+        </Typography>
       </Grid>
       <Grid item xs={3}>
         最短値(msec)
@@ -200,6 +233,7 @@ export default function MainEditor({ scheme, botId }) {
             backgroundColor: "#ffffff",
             p: 1
           }}
+          fullWidth
           error={state.message === 'error:interval.min'}
         />
         {state.message === 'error:interval.min' &&
@@ -218,11 +252,36 @@ export default function MainEditor({ scheme, botId }) {
             backgroundColor: "#ffffff",
             p: 1
           }}
+          fullWidth
           error={state.message === 'error:interval.max'}
         />
         {state.message === 'error:interval.max' &&
           <Alert severity='error'>
             正の整数で、最短値より大きい値を指定してください</Alert>
+        }
+      </Grid>
+      <Grid item xs={12}>
+        <Typography>応答</Typography>
+        <Typography variant="caption">
+
+        </Typography>
+      </Grid>
+      <Grid item xs={3}>
+        最小スコア
+      </Grid>
+      <Grid item xs={8}>
+        <Input
+          value={state.response.minIntensity}
+          onChange={e => dispatch({ type: 'changeMinIntensity', value: e.target.value })}
+          sx={{
+            backgroundColor: "#ffffff",
+            p: 1
+          }}
+          fullWidth
+        />
+        {state.message === 'error:response.minIntensity' &&
+          <Alert severity='error'>
+            0より大きい数値を指定してください</Alert>
         }
       </Grid>
     </Grid>
