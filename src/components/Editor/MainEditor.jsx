@@ -8,6 +8,8 @@ import Alert from '@mui/material/Alert';
 import AvatarSelector from './AvatarSelector';
 import ColorSelector from './ColorSelector';
 
+import { mainModel, getDefaultMemories } from './MainModel';
+
 const chatbotsQuery = graphql`
 query {
   allFile(filter: {sourceInstanceName: {eq: "botAvatar"}, ext: {eq: ".svg"}}) {
@@ -54,9 +56,7 @@ const initialState = {
   response: {
     minIntensity: 0.3
   },
-  memory: {
-    "{BOT_NAME}": ""
-  },
+  memory: getDefaultMemories(),
   message: null
 };
 
@@ -78,61 +78,166 @@ function reducer(state, action) {
       }
     }
 
-    case 'changeValue': {
+    case 'change': {
+      if(action.subKey){
+        switch (action.key) {
+          case 'memory': {
+            return {
+              ...state,
+              memory: {
+                ...state.memory,
+                [action.subKey]: action.value
+              }
+            }
+          }
+          case 'interval': {
+            return {
+              ...state,
+              interval: {
+                ...state.interval,
+                [action.subKey]: action.value
+              }
+            }
+          }
+          case 'response': {
+            return {
+              ...state,
+              response: {
+                ...state.response,
+                [action.subKey]: action.value
+              }
+            }
+          }
+          default:
+            throw new Error(`invalid dict name ${action.key}`)
+        }
+      }
       return {
         ...state,
         [action.key]: action.value
       }
+
     }
-
-    case 'changeIntervMin': {
-      const val = parseInt(action.value);
-      const stateMax = parseInt(state.interval.max);
-
-      return {
-        ...state,
-        interval: {
-          max: state.interval.max,
-          min: action.value
-        },
-        message: (val >= 0 && stateMax > val) ? null : "error:interval.min"
-      }
-    }
-    case 'changeIntervMax': {
-      const val = parseInt(action.value);
-      const stateMin = parseInt(state.interval.min);
-
-      return {
-        ...state,
-        interval: {
-          max: action.value,
-          min: state.interval.min
-        },
-        message: (val >= 0 && val > stateMin) ? null : "error:interval.max"
-      }
-    }
-
-    case 'changeMinIntensity': {
-      const v = parseFloat(action.value);
-      return {
-        ...state,
-        response: {
-          minIntensity: action.value
-        },
-        message: (v && 0 < v) ? null : "error:response.minInterval"
-      }
-    }
-
 
     default:
-      throw new Error(`invalid action ${action.type}`);
+      throw new Error(`invalid action ${action.type}`)
   }
 }
 
-export default function MainEditor({ scheme, botId }) {
+
+
+export default function SettingsEditor({ scheme, botId }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const botAvatars = getBotAvatars(chatbotsSnap);
+
+  function renderItems(state) {
+    let items = [];
+
+    function render(children) {
+      for (let child of children) {
+        items.push(
+          <Grid item xs={12}>
+            <Typography variant="caption">
+              {child.caption}
+            </Typography>
+          </Grid>
+        );
+
+        switch (child.inputType) {
+          case 'string':
+          case 'strings':
+            items.push(
+              <Grid item xs={12}>
+                <Input
+                  value={child.subKey ? state[child.key][child.subKey] : state[child.key]}
+                  onChange={e => dispatch({
+                    type: 'change',
+                    key: child.key, subKey: child.subKey, value: e.target.value
+                  })}
+                  sx={{ backgroundColor: "#ffffff", p: 1 }}
+                  fullWidth
+                />
+                {child.validator() === false &&
+                  <Alert severity="error">入力値が正しくありません</Alert>
+                }
+              </Grid>
+            )
+            break;
+          case 'text': {
+            items.push(
+              <Grid item xs={12}>
+                <Input
+                  value={state[child.key]}
+                  onChange={e => dispatch({
+                    type: 'change', key: child.key, value: e.target.value
+                  }
+                  )}
+                  sx={{ backgroundColor: "#ffffff", p: 1 }}
+                  maxRows={3}
+                  multiline
+                  fullWidth
+                />
+              </Grid>
+            );
+            break;
+          }
+
+          case 'avatarSelector':
+            items.push(
+              <Grid item xs={12}>
+                <AvatarSelector
+                  avatars={Object.keys(botAvatars)}
+                  value={state[child.key]}
+                  handleChange={e => dispatch({
+                    type: 'change', key: child.key, value: e.target.value
+                  })}
+                  bgColog={state.backgroundColor}
+                />
+              </Grid>
+            );
+            break;
+          case 'colorSelector':
+            items.push(
+              <Grid item xs={12}>
+                <ColorSelector
+                  value={state[child.key]}
+                  handleChange={e => dispatch({
+                    type: 'change', key: child.key, value: e.target.value
+                  })}
+                />
+              </Grid>
+            );
+            break;
+          case 'timestamp':
+            items.push(
+              <Grid item xs={12}>
+                {`${state[child.key][0]} ${state[child.key][1]}`}
+              </Grid>
+            )
+            break;
+          case 'hours':
+            break;
+          default:
+            throw new Error(`invalid inputType ${child.inputType}`);
+        }
+      }
+    }
+
+    for (let group of mainModel) {
+      if (group.header) {
+        items.push(
+          <Grid item container>
+            <Typography>{group.header}</Typography>
+            {render(group.children)}
+          </Grid>
+        )
+      } else {
+        items.concat(render(group.children));
+      }
+    }
+    return items;
+  }
 
   useEffect(() => {
     if (scheme && scheme.payload.timestamp) {
@@ -148,142 +253,9 @@ export default function MainEditor({ scheme, botId }) {
 
   return (
     <Grid container
-      spacing={2}
-      padding={1}
+      spacing={2} padding={1}
     >
-      <Grid item xs={3}>
-        id
-      </Grid>
-      <Grid item xs={8}>
-        {state.botId}
-      </Grid>
-      <Grid item xs={3}>
-        アバター
-      </Grid>
-      <Grid item xs={8}>
-        <AvatarSelector
-          avatars={Object.keys(botAvatars)}
-          value={state.avatarDir}
-          handleChange={e => dispatch({ type: 'changeValue', key: 'avatarDir', value: e.target.value })}
-          bgColor={state.backgroundColor}
-        />
-      </Grid>
-      <Grid item xs={3}>
-        概要
-      </Grid>
-      <Grid item xs={8}>
-        <Input
-          placeholder="チャットボットの概要"
-          value={state.description}
-          onChange={e => dispatch({ type: 'changeValue', key: 'description', value: e.target.value })}
-          maxRows={3}
-          multiline
-          fullWidth
-          sx={{
-            backgroundColor: "#ffffff",
-            p: 1
-          }}
-        />
-      </Grid>
-      <Grid item xs={3} >
-        作者
-      </Grid>
-      <Grid item xs={8}>
-        <Input
-          value={state.author}
-          onChange={e => dispatch({ type: 'changeValue', key: 'author', value: e.target.value })}
-          sx={{
-            backgroundColor: "#ffffff",
-            p: 1
-          }}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={3}>
-        背景色
-      </Grid>
-      <Grid item xs={8}>
-        <ColorSelector
-          value={state.backgroundColor}
-          handleChange={v => dispatch({ type: 'changeValue', key: 'backgroundColor', value: v })}
-        />
-      </Grid>
-      <Grid item xs={3}>
-        更新日時
-      </Grid>
-      <Grid item xs={8}>
-        {`${state.timestamp[0]} ${state.timestamp[1]}`}
-      </Grid>
-      <Grid item xs={12}>
-        <Typography>返答のインターバル</Typography>
-        <Typography variant="caption">
-          チャットボットはある周期で返答を返します。
-          周期が短いと思いついたことを色々しゃべるように、周期が長いと考えてしゃべるように振る舞います。
-          この周期は下記の最短値、最小値の間でランダムに変動します。
-        </Typography>
-      </Grid>
-      <Grid item xs={3}>
-        最短値(msec)
-      </Grid>
-      <Grid item xs={8}>
-        <Input
-          value={state.interval.min}
-          onChange={e => dispatch({ type: 'changeIntervMin', value: e.target.value })}
-          sx={{
-            backgroundColor: "#ffffff",
-            p: 1
-          }}
-          fullWidth
-          error={state.message === 'error:interval.min'}
-        />
-        {state.message === 'error:interval.min' &&
-          <Alert severity='error'>
-            正の整数で、最長値よりも小さい値を指定してください</Alert>
-        }
-      </Grid>
-      <Grid item xs={3}>
-        最長値(msec)
-      </Grid>
-      <Grid item xs={8}>
-        <Input
-          value={state.interval.max}
-          onChange={e => dispatch({ type: 'changeIntervMax', value: e.target.value })}
-          sx={{
-            backgroundColor: "#ffffff",
-            p: 1
-          }}
-          fullWidth
-          error={state.message === 'error:interval.max'}
-        />
-        {state.message === 'error:interval.max' &&
-          <Alert severity='error'>
-            正の整数で、最短値より大きい値を指定してください</Alert>
-        }
-      </Grid>
-      <Grid item xs={12}>
-        <Typography>応答</Typography>
-        <Typography variant="caption">
-
-        </Typography>
-      </Grid>
-      <Grid item xs={3}>
-        最小スコア
-      </Grid>
-      <Grid item xs={8}>
-        <Input
-          value={state.response.minIntensity}
-          onChange={e => dispatch({ type: 'changeMinIntensity', value: e.target.value })}
-          sx={{
-            backgroundColor: "#ffffff",
-            p: 1
-          }}
-          fullWidth
-        />
-        {state.message === 'error:response.minIntensity' &&
-          <Alert severity='error'>
-            0より大きい数値を指定してください</Alert>
-        }
-      </Grid>
+      {renderItems(scheme, state)}
     </Grid>
   )
 }
