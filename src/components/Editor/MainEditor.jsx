@@ -4,6 +4,7 @@ import Grid from '@mui/material/Grid';
 import Input from '@mui/material/Input';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import Slider from '@mui/material/Slider';
 
 import AvatarSelector from './AvatarSelector';
 import ColorSelector from './ColorSelector';
@@ -79,7 +80,7 @@ function reducer(state, action) {
     }
 
     case 'change': {
-      if(action.subKey){
+      if (action.subKey) {
         switch (action.key) {
           case 'memory': {
             return {
@@ -131,7 +132,7 @@ export default function SettingsEditor({ scheme, botId }) {
   const chatbotsSnap = useStaticQuery(chatbotsQuery);
   const botAvatars = getBotAvatars(chatbotsSnap);
 
-  function renderItems(state) {
+  function renderItems() {
     let items = [];
 
     function render(children) {
@@ -147,10 +148,11 @@ export default function SettingsEditor({ scheme, botId }) {
         switch (child.inputType) {
           case 'string':
           case 'strings':
+            let v = 'subKey' in child ? state[child.key][child.subKey] : state[child.key];
             items.push(
               <Grid item xs={12}>
                 <Input
-                  value={child.subKey ? state[child.key][child.subKey] : state[child.key]}
+                  value={v}
                   onChange={e => dispatch({
                     type: 'change',
                     key: child.key, subKey: child.subKey, value: e.target.value
@@ -158,7 +160,7 @@ export default function SettingsEditor({ scheme, botId }) {
                   sx={{ backgroundColor: "#ffffff", p: 1 }}
                   fullWidth
                 />
-                {child.validator() === false &&
+                {child.validator(state, v) === false &&
                   <Alert severity="error">入力値が正しくありません</Alert>
                 }
               </Grid>
@@ -183,7 +185,7 @@ export default function SettingsEditor({ scheme, botId }) {
             break;
           }
 
-          case 'avatarSelector':
+          case 'avatar':
             items.push(
               <Grid item xs={12}>
                 <AvatarSelector
@@ -197,13 +199,13 @@ export default function SettingsEditor({ scheme, botId }) {
               </Grid>
             );
             break;
-          case 'colorSelector':
+          case 'color':
             items.push(
               <Grid item xs={12}>
                 <ColorSelector
                   value={state[child.key]}
-                  handleChange={e => dispatch({
-                    type: 'change', key: child.key, value: e.target.value
+                  handleChange={v => dispatch({
+                    type: 'change', key: child.key, value: v
                   })}
                 />
               </Grid>
@@ -217,6 +219,21 @@ export default function SettingsEditor({ scheme, botId }) {
             )
             break;
           case 'hours':
+
+            items.push(
+              <Grid item xs={12}>
+                <Slider
+                  aria-label={child.key}
+                  value={parseInt(state[child.key])}
+                  step={1}
+                  min={0} max={23}
+                  marks
+                  onChange={(e, v) => dispatch({
+                    type: 'change', key: child.key, value: String(v)
+                  })}
+                />
+              </Grid>
+            )
             break;
           default:
             throw new Error(`invalid inputType ${child.inputType}`);

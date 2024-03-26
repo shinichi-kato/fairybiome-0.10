@@ -60,7 +60,7 @@ export const mainModel = [
       {
         key: "avatarDir",
         caption: "チャットボットの姿",
-        inputType: "avatarSelector",
+        inputType: "avatar",
         validator: stringValidator,
         required: true,
       },
@@ -74,7 +74,7 @@ export const mainModel = [
       {
         key: "author",
         caption: "作者名",
-        InputType: "string",
+        inputType: "string",
         validator: nopValidator,
         required: false
       },
@@ -129,7 +129,7 @@ export const mainModel = [
         key: "memory",
         subKey: "{BOT_NAME}",
         caption: "チャットボットの名前。吹き出しにも表示される。",
-        type: "string",
+        inputType: "string",
         defaultValue: "名前",
         required: true,
         validator: stringValidator,
@@ -138,7 +138,7 @@ export const mainModel = [
         key: "memory",
         subKey: "{I}",
         caption: "チャットボットが自身を呼ぶときに使う一人称。複数の候補がある場合はカンマ(,)区切り",
-        type: "strings",
+        inputType: "strings",
         defaultValue: ["私"],
         required: true,
         validator: stringValidator,
@@ -147,7 +147,7 @@ export const mainModel = [
         key: "memory",
         subKey: "{YOU}",
         caption: "チャットボットが会話相手を呼ぶときに使う二人称。複数の候補がある場合はカンマ(,)区切り",
-        type: "strings",
+        inputType: "strings",
         defaultValue: ['あなた'],
         required: true,
         validator: stringValidator,
@@ -156,7 +156,7 @@ export const mainModel = [
         key: "memory",
         subKey: "{NICKNAMES}",
         caption: "チャットボットのニックネーム。複数の候補がある場合はカンマ(,)区切り",
-        type: "strings",
+        inputType: "strings",
         defaultValue: ["ニックネーム"],
         required: true,
         validator: stringValidator,
@@ -164,16 +164,16 @@ export const mainModel = [
       {
         key: "memory",
         subKey: "{AWAKENING_HOUR}",
-        caption: "起床時刻を0~23の整数で指定。",
-        type: "hours",
+        caption: "起床時刻",
+        inputType: "hours",
         defaultValue: [7],
         validator: hourValidator,
       },
       {
         key: "memory",
         subKey: "{BEDTIME_HOUR}",
-        caption: "就寝時刻を0~23の整数で指定。",
-        type: "hours",
+        caption: "就寝時刻",
+        inputType: "hours",
         defaultValue: [21],
         validator: hourValidator,
       },
@@ -183,8 +183,13 @@ export const mainModel = [
 
 export function getDefaultMemories(){
   let dict = {};
-  for (let item of mainModel.memory){
-    dict[item.key]=item.defaultValue;
+  for (let group of mainModel){
+    for(let child of group.children){
+      if(child.key === 'memory'){
+        dict[child.subKey] = child.defaultValue || "";
+      }
+    }
   }
+  console.log(dict)
   return dict;
 }

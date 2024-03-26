@@ -35,7 +35,7 @@ const menuItems = palette.map(col => (
 ));
 export default function ColorPicker({ value, handleChange }) {
   useEffect(() => {
-    if (value === "") {
+    if (value === "" || !value) {
       handleChange(palette[0]);
     }
   }, [value, handleChange]);
