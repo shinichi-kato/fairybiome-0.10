@@ -64,6 +64,27 @@ nameには起源となったpartの名前を格納してこのメッセージと
 ユーザの入退室、季節や時刻、天候などの環境の変化が生じた場合このメッセージを投入する。
 textには{env.user_login}、{env.morning}などのタグを用いる。{env.*}
 
+### タイマーからの入力
+main辞書に以下のデータを記載する。centralが動作している間にこの条件を満たした場合、
+タグがトリガされる。hour,minを省略した場合は起動時に満たしたとみなす。
+timerEvents: {
+    "{任意のタグ}":{
+        year: 2034,
+        month: 12,
+        date: null,
+        day: "Monday",
+        hour: 23,
+        min: 15
+    }
+}
+毎年同じ日に実行
+{ "{birthday}":{month:12,date:23} }
+月曜日の朝に実行
+{ "{monday}":{day: "Monday",hour:7} }
+
+
+}
+
 ## 会話の動作機序
 
 1. {type: 'input'}を受け取ったとき、チャットボットが

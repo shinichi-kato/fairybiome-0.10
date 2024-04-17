@@ -17,5 +17,15 @@
         "{YOU}": ["あなた"],
         "{AWAKENING_HOUR}": 7,
         "{BEDTIME_HOUR}": 21
+    },
+    "timer": {
+        "{ALARM_MONDAY}": {
+            "year": null,
+            "month": null,
+            "date": null,
+            "day": "Monday",
+            "hour": null,
+            "minute": null
+        }
     }
 }

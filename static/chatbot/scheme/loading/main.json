@@ -17,5 +17,10 @@
         "{YOU}": ["あなた"],
         "{AWAKENING_HOUR}": 7,
         "{BEDTIME_HOUR}": 21
+    },
+    "timerEvents": {
+        "{ALARM_MONDAY}":{
+            
+        } 
     }
 }

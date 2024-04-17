@@ -13,6 +13,95 @@ import { noder } from './noder';
 
 const RE_PERSISTENT_TAG = /^[A-Z][A-Za-z0-9_]*$/;
 
+const day2index = {
+  'sun': 0, 'sunday': 0,
+  'mon': 1, 'monday': 1,
+  'tue': 2, 'tuesday': 2,
+  'wed': 3, 'wednesday': 3,
+  'thu': 4, 'thursday': 4,
+  'fri': 5, 'friday': 5,
+  'sat': 6, 'saturday': 6
+}
+
+export function initTiming(s) {
+  /*
+   {year,month,date,day,hour,minute}という辞書型データから
+   今後発火するタイミングを示すdatetimeを生成する。
+   
+   1. day(曜日)が指定された場合date(日)は無視し、同じ曜日の次に現れる日
+      が指定されたとみなす。曜日が同じ場合は今日であるとみなす。
+   2. !yearの場合now,!monthの場合now,!dateの場合nowとそれぞれみなす
+   3. !minのばあいmin=0とする
+   4. !hourの場合nowとする
+  */
+  const now = new Date();
+  // 1.!dayの場合同じ曜日の次の日(曜日が同じなら今日)
+  let date = s.date;
+  if (s.day) {
+    let sd = s.day.toLowerCase();
+    if (sd in day2index) {
+      sd = day2index[sd]
+    }
+    else {
+      return `invalid day string ${s.day}, candidates are: ${Object.keys(day2index)}`;
+    }
+    let nd = now.getDay();
+
+    date = now.getDate() + (sd >= nd ? sd - nd : sd - nd + 7)
+  }
+
+  return new Date(
+    s.year || now.getFullYear(),
+    s.month ? s.month : now.getMonth(),
+    date || now.getDate(),
+    s.hour || now.getHours(),
+    s.minute || now.getMinutes()
+  )
+
+}
+
+export function updateTiming(s) {
+  /*
+    一度タイマーが発火したあとで
+    {year,month,date,day,hour,minute}という辞書型データから次に
+    発火するをdatetimeを更新する。曜日指定の場合は一週間後、その他は過去の
+    日付にすることで更新のたびに発火するのを防ぐ
+   
+   1. day(曜日)が指定された場合date(日)は無視し、同じ曜日の次に現れる日
+      が指定されたとみなす
+   2. !yearの場合now,!monthの場合now,!dateの場合nowとそれぞれみなす
+   3. !minのばあいmin=0とする
+   4. !hourの場合nowとする
+
+  */
+  const now = new Date();
+  // 1.!dayの場合同じ曜日の次の日
+  let date = s.date;
+  if (s.day) {
+    let sd = s.day.toLowerCase();
+    if (sd in day2index) {
+      sd = day2index[sd]
+    }
+    else {
+      return `invalid day string ${s.day}, candidates are: ${Object.keys(day2index)}`;
+    }
+    let nd = now.getDay();
+
+    date = now.getDate() + (sd > nd ? sd - nd : sd - nd + 7)
+    return new Date(
+      s.year || now.getFullYear(),
+      s.month ? s.month : now.getMonth(),
+      date || now.getDate(),
+      s.hour || now.getHours(),
+      s.minute || now.getMinutes()
+    )
+  }
+
+  // 曜日指定がないものは再び発火しない。
+  // Dateは西暦273790年あたりまでが上限のため、上限値を返すことで発火させない
+  return new Date(273790,9)
+}
+
 export const scheme = {
   botId: null,
   ownerId: null,
@@ -25,10 +114,12 @@ export const scheme = {
   },
   response: {
     minIntensity: 0.1,  // この値よりもスコアが小さい返答は採用しない
-
-
   },
   memory: {},
+  timer: {
+    prevDateTime: new Date(),
+    events: {},
+  },
   parts: [],
   partLoadCounter: [],
   innerOutputs: [],
@@ -52,7 +143,21 @@ export const scheme = {
     };
     scheme.response = { ...payload.response };
     scheme.memory = { ...payload.memory };
+
     scheme.displayName = scheme.memory["{BOT_NAME}"];
+
+    scheme.lastTimestamp = new Date();
+    scheme.timer = { ...payload.timer };
+    scheme.timer = {}
+    for (let eventName in payload.timer) {
+      const event = scheme.timer[eventName];
+      scheme.timer[eventName] = {
+        ...event,
+        next: initTiming(event)
+      }
+
+    }
+
     scheme.channel.onmessage = event => {
       const action = event.data;
       switch (action.type) {
@@ -65,7 +170,7 @@ export const scheme = {
           break;
 
         default:
-          /* nop */
+        /* nop */
       }
     }
     scheme.channel.onmessageerror = event => {
@@ -136,8 +241,34 @@ export const scheme = {
       }
     }
 
-    scheme.memory['{REQUEST_COUNT}']=null;
+    scheme.memory['{REQUEST_COUNT}'] = null;
     return true;
+
+  },
+
+  alarm: () => {
+    /*
+      run()実行時に呼び出され、scheme.timerに定義された時刻を
+      超えたら所定のタグを送出する。
+
+      各event
+      
+      直前のalarm()呼び出し日時を記憶しておき、各アラームについて
+      前回が設定時刻のほうが未来、今回は設定時刻のほうが過去になった
+      ものはinvokeする。
+    */
+    const now = new Date();
+    for (let eventName in scheme.timer) {
+      const event = scheme.timer[eventName];
+
+      if (event.next < now) {
+        const m = new Message('env', eventName)
+        scheme.channel.postMessage({ type: 'input', message: message });
+        scheme.timer[eventName].next = updateTiming(event);
+      }
+
+    }
+
 
   },
 
